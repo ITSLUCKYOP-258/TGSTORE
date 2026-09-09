@@ -1,8 +1,14 @@
 /** Small JSON API wrapper — cookies are sent automatically (same-origin / proxied). */
 const BASE = '/api';
 
+// Accepts both '/categories' and '/api/categories' (legacy callers pass the full prefix).
+function normalize(path) {
+  if (!path) return '/';
+  return path.startsWith('/api/') ? path.slice(4) : path;
+}
+
 async function request(path, options = {}) {
-  const res = await fetch(BASE + path, {
+  const res = await fetch(BASE + normalize(path), {
     credentials: 'include',
     ...options,
     headers: {
@@ -20,9 +26,12 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  get: (path) => request(path),
+  post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body ?? {}) }),
   // Auth
   devLogin: () => request('/auth/dev', { method: 'POST', body: '{}' }),
   me: () => request('/auth/me'),
+  logout: () => request('/auth/logout', { method: 'POST', body: '{}' }),
 
   // MTProto
   mtConfig: () => request('/mt/config'),

@@ -4,6 +4,7 @@ import { api } from './api.js';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import ShareView from './pages/ShareView.jsx';
+import Setup from './pages/Setup.jsx';
 
 const AuthContext = createContext({ user: null, loading: true, setUser: () => {} });
 export const useAuth = () => useContext(AuthContext);
@@ -45,6 +46,7 @@ export default function App() {
           element={user ? <Dashboard /> : <Navigate to="/login" replace state={{ from: location }} />}
         />
         <Route path="/s/:token" element={<ShareView />} />
+        <Route path="/setup" element={<Setup />} />
         <Route path="*" element={<Navigate to={user ? '/app' : '/login'} replace />} />
       </Routes>
     </AuthContext.Provider>

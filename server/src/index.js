@@ -77,8 +77,25 @@ app.get('/api/mt/direct-test', (_req, res) => {
 // Serve the built frontend in production
 const distDir = path.join(__dirname, '..', '..', 'client', 'dist');
 if (fs.existsSync(distDir)) {
-  app.use(express.static(distDir));
-  app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(path.join(distDir, 'index.html')));
+  // Hashed assets are content-addressed -> cache forever.
+  // index.html must NEVER be cached so fresh deploys are picked up immediately.
+  app.use(
+    express.static(distDir, {
+      maxAge: '365d',
+      immutable: true,
+      index: false,
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
+      },
+    })
+  );
+  app.get(/^(?!\/api).*/, (_req, res) => {
+    res.sendFile(path.join(distDir, 'index.html'), {
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+    });
+  });
 }
 
 // eslint-disable-next-line no-unused-vars
