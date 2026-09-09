@@ -3,6 +3,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import db, { upsertTelegramUser, getUserById } from '../db.js';
 import { requireAuth, signToken, setAuthCookie } from '../auth.js';
+import { resolveMime } from '../mime.js';
 import {
   isConfigured,
   startLoginFlow,
@@ -13,7 +14,9 @@ import {
   listDialogs,
   listMedia,
   getMessage,
+  getMessageThumb,
   downloadBytes,
+  getSavedMessagesId,
 } from '../mtproto.js';
 
 const router = Router();
@@ -125,7 +128,7 @@ async function serve(req, res, asAttachment) {
     if (!client) return res.status(404).json({ error: 'Media not found' });
     const size = loc.size;
     const baseHeaders = {
-      'Content-Type': info.mime || 'application/octet-stream',
+      'Content-Type': resolveMime(info.name, info.mime),
       'Accept-Ranges': 'bytes',
       'Content-Disposition': `${asAttachment ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(info.name)}`,
     };
@@ -162,6 +165,23 @@ async function serve(req, res, asAttachment) {
 router.get('/media/:chat/:msg/download', requireAuth, (req, res) => serve(req, res, true));
 router.get('/media/:chat/:msg/raw', requireAuth, (req, res) => serve(req, res, false));
 
+/**
+ * GET /media/:chat/:msg/thumb — small JPEG preview Telegram embeds inside
+ * image/video messages. Used by the Saved Messages grid (and any other
+ * Telegram-backed media listing).
+ */
+router.get('/media/:chat/:msg/thumb', requireAuth, async (req, res) => {
+  try {
+    const jpeg = await getMessageThumb(req.userId, req.params.chat, req.params.msg);
+    if (!jpeg) return res.status(404).json({ error: 'No thumbnail available' });
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.send(jpeg);
+  } catch (err) {
+    if (!res.headersSent) res.status(errorStatus(err)).json({ error: err.message });
+  }
+});
+
 /* ---------- Saved Messages ---------- */
 router.get('/saved-messages', requireAuth, async (req, res) => {
   try {
@@ -180,8 +200,33 @@ router.post('/saved-messages/copy', requireAuth, async (req, res) => {
     const { savedMessageId, channelId, caption } = req.body || {};
     if (!savedMessageId) return res.status(400).json({ error: 'savedMessageId is required' });
     if (!channelId) return res.status(400).json({ error: 'channelId is required' });
-    
-    const result = await copySavedMediaToChannel(req.userId, savedMessageId, channelId, caption || '');
+
+    // Resolve the access hash server-side from the user's own categories —
+    // never trust client-supplied secrets.
+    const cat = db.listCategories(req.userId).find(
+      (c) =>
+        c.channel_id === String(channelId) ||
+        `-100${c.channel_id}` === String(channelId)
+    );
+    if (!cat || !cat.access_hash) {
+      return res.status(400).json({
+        error:
+          'This endpoint only works for your own category channels (access hash not found). ' +
+          'Use POST /api/files/upload-from-saved instead.'
+      });
+    }
+
+    const result = await copySavedMediaToChannel(
+      req.userId,
+      savedMessageId,
+      cat.channel_id,
+      cat.access_hash,
+      caption || ''
+    );
+    console.log(
+      `[mt] saved-messages/copy user=${req.userId} channel=${cat.channel_id} ` +
+      `messageId=${result.messageId}`
+    );
     res.json({ messageId: result.messageId, fileId: result.fileId });
   } catch (err) {
     res.status(errorStatus(err)).json({ error: err.message });

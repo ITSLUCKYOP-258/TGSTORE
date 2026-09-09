@@ -16,12 +16,19 @@ export default function MediaGrid({ media, onPreview, onDownload, onDelete, show
           className="group relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 cursor-pointer transition hover:border-indigo-300 hover:shadow-md"
           onClick={() => onPreview?.(item)}
         >
-          {item.thumbnail ? (
-            <img src={item.thumbnail} alt={item.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-4xl">
-              {item.mime?.startsWith('video') ? '🎬' : item.mime?.startsWith('image') ? '🖼' : '📄'}
-            </div>
+          {/* Icon fallback (always rendered underneath) */}
+          <div className="w-full h-full flex items-center justify-center text-4xl">
+            {gridIcon(item)}
+          </div>
+          {/* Real thumbnail on top — removes itself on load error to reveal the icon */}
+          {item.thumbnail && (
+            <img
+              src={item.thumbnail}
+              alt={item.name}
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => e.currentTarget.remove()}
+            />
           )}
           
           {/* Overlay */}
@@ -59,16 +66,41 @@ export default function MediaGrid({ media, onPreview, onDownload, onDelete, show
             </div>
           )}
           
-          {/* Video indicator */}
-          {item.mime?.startsWith('video') && (
+          {/* Video / audio indicator */}
+          {(gridKind(item) === 'video' || gridKind(item) === 'audio') && (
             <div className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
-              ▶ {item.duration || ''}
+              ▶ {gridKind(item) === 'audio' ? 'audio' : (item.duration || 'video')}
             </div>
           )}
         </div>
       ))}
     </div>
   );
+}
+
+function gridExt(name) {
+  return String(name || '').split('.').pop().toLowerCase();
+}
+
+/** Tile type by MIME first, extension fallback (some uploads are stored as application/octet-stream). */
+function gridKind(item) {
+  const mime = item.mime || '';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('audio/')) return 'audio';
+  const ext = gridExt(item.name);
+  if (['mp4', 'm4v', 'webm', 'mov', 'mkv', 'avi'].includes(ext)) return 'video';
+  if (['mp3', 'wav', 'ogg', 'oga', 'm4a', 'flac', 'aac', 'opus'].includes(ext)) return 'audio';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif'].includes(ext)) return 'image';
+  return 'other';
+}
+
+function gridIcon(item) {
+  const k = gridKind(item);
+  if (k === 'video') return '🎬';
+  if (k === 'image') return '🖼';
+  if (k === 'audio') return '🎵';
+  return '📄';
 }
 
 function formatBytes(bytes) {

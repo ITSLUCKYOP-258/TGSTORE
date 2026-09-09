@@ -7,7 +7,7 @@ const router = Router();
 
 router.use(requireAuth);
 
-const shapeFolder = (f) => ({
+const shapeFolder = (f, userId) => ({
   id: f.id,
   name: f.name,
   categoryId: f.category_id,
@@ -17,6 +17,7 @@ const shapeFolder = (f) => ({
   createdAt: f.created_at,
   type: 'folder',
   channelMessageId: f.channel_message_id,
+  itemCount: userId != null ? db.countFolderItems(f.id, userId) : 0,
 });
 
 /** GET /?categoryId=<id>&parentId=<id|null> */
@@ -30,8 +31,12 @@ router.get('/', (req, res) => {
         req.query.parentId && req.query.parentId !== 'null'
           ? Number(req.query.parentId)
           : null;
-  const folders = db.listFolders(userId, categoryId, parentId).map(shapeFolder);
-  res.json({ folders });
+  const folders = db.listFolders(userId, categoryId, parentId).map((f) => shapeFolder(f, userId));
+  const currentFolder = parentId ? db.getFolder(parentId, userId) : null;
+  res.json({
+    folders,
+    currentFolder: currentFolder ? shapeFolder(currentFolder, userId) : null,
+  });
 });
 
 /** GET /tree?categoryId=<id> — folder tree for "Move to" dialog */
@@ -78,27 +83,52 @@ router.post('/', async (req, res) => {
   }
 
   let channelMessageId = 0;
-  
-  // Post folder message in category channel
+
+  // Post the folder marker message in the user's category channel.
+  // Without it, file uploads have nothing to reply to, so this MUST succeed.
   if (categoryId != null) {
     const category = db.getCategory(categoryId, req.userId);
     if (category && category.channel_id) {
+      if (!category.access_hash) {
+        return res.status(500).json({
+          error:
+            'Category has no saved accessHash. Delete and recreate this category ' +
+            '(required for channel operations).'
+        });
+      }
       try {
+        console.log(
+          `[folders] posting folder marker user=${req.userId} category=${categoryId} ` +
+          `channel=${category.channel_id} name="${name}"`
+        );
+        const markerText = `📁 files::tgstore::${name}`;
         const result = await postTextMessage(
           req.userId,
           category.channel_id,
-          `📁 Folder: ${name}`
+          category.access_hash,
+          markerText
         );
         channelMessageId = result.messageId;
+        console.log(
+          `[folders] folder marker posted user=${req.userId} category=${categoryId} ` +
+          `messageId=${channelMessageId}`
+        );
       } catch (err) {
-        console.error('Failed to post folder message in channel:', err.message);
-        // Continue anyway - folder is still created
+        console.error(
+          `[folders] FAILED to post folder marker (user ${req.userId}, category ${categoryId}):`,
+          err?.message || err
+        );
+        return res.status(err?.status || 502).json({
+          error: `Could not post folder marker in the Telegram channel: ${err?.message || err}. ` +
+            'Folder creation cancelled — make sure you created the category with your own ' +
+            'Telegram account.'
+        });
       }
     }
   }
 
   const id = db.insertFolder(req.userId, categoryId, parentId, name, channelMessageId);
-  res.status(201).json({ folder: shapeFolder(db.getFolder(id, req.userId)) });
+  res.status(201).json({ folder: shapeFolder(db.getFolder(id, req.userId), req.userId) });
 });
 
 /** PATCH /:id — rename, star, trash, move */
@@ -119,7 +149,7 @@ router.patch('/:id', (req, res) => {
     }
     db.moveFolder(folder.id, req.userId, target);
   }
-  res.json({ folder: shapeFolder(db.getFolder(folder.id, req.userId)) });
+  res.json({ folder: shapeFolder(db.getFolder(folder.id, req.userId), req.userId) });
 });
 
 /** DELETE /:id — permanent delete (purges contained files from Telegram) */

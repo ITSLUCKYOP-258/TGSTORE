@@ -4,6 +4,16 @@ import { requireAuth } from '../auth.js';
 
 const router = Router();
 
+/** Media files get a thumbnail endpoint so grids can show real previews. */
+const shapeFile = (f) => ({
+  ...f,
+  type: 'file',
+  thumbnail:
+    f.mime && (String(f.mime).startsWith('image/') || String(f.mime).startsWith('video/'))
+      ? `/api/files/${f.id}/thumb`
+      : undefined,
+});
+
 const shapeFolder = (f) => ({
   id: f.id,
   name: f.name,
@@ -30,13 +40,13 @@ router.get('/', requireAuth, (req, res) => {
 
   if (view === 'search' && q) {
     folders = db.searchFolders(userId, q).map(shapeFolder);
-    files = db.searchFiles(userId, q);
+    files = db.searchFiles(userId, q).map(shapeFile);
   } else if (view === 'starred') {
     folders = db.listStarredFolders(userId).map(shapeFolder);
-    files = db.listStarredFiles(userId);
+    files = db.listStarredFiles(userId).map(shapeFile);
   } else if (view === 'trash') {
     folders = db.listTrashedFolders(userId).map(shapeFolder);
-    files = db.listTrashedFiles(userId);
+    files = db.listTrashedFiles(userId).map(shapeFile);
   } else {
     const folderId = req.query.folder && req.query.folder !== 'null' ? Number(req.query.folder) : null;
     if (folderId != null) {
@@ -50,7 +60,7 @@ router.get('/', requireAuth, (req, res) => {
       }
     }
     folders = db.listFolders(userId, categoryId, folderId).map(shapeFolder);
-    files = db.listFiles(userId, categoryId, folderId);
+    files = db.listFiles(userId, categoryId, folderId).map(shapeFile);
   }
 
   breadcrumbs.unshift({ id: null, name: categoryId ? `Category` : 'My Drive' });
@@ -60,9 +70,23 @@ router.get('/', requireAuth, (req, res) => {
 export async function purgeFile(file, userId) {
   const chunks = db.getChunks(file.id);
   const { deleteStoredMessage } = await import('../telegram.js');
-  await Promise.allSettled(chunks.map((c) => deleteStoredMessage(c.chat_id, c.message_id)));
+  const { deleteMessages } = await import('../mtproto.js');
+  const accessHash = file.category_id
+    ? db.getCategory(file.category_id, userId)?.access_hash || null
+    : null;
+  await Promise.allSettled(chunks.map((c) => {
+    // Chunks with a numeric tg_file_id were stored via the USER's MTProto
+    // session → they live in the USER's channel and must be deleted with the
+    // user's session (the bot is not a member there). Legacy bot-API chunks
+    // keep using the bot path.
+    if (/^\d+$/.test(String(c.tg_file_id || ''))) {
+      return deleteMessages(userId, c.chat_id, [c.message_id], accessHash).catch((err) =>
+        console.error(`[purge] failed to delete msg ${c.message_id} from user channel: ${err?.message || err}`)
+      );
+    }
+    return deleteStoredMessage(c.chat_id, c.message_id);
+  }));
   db.deleteFileRow(file.id, userId);
-  void userId;
 }
 
 /** POST /trash/empty — permanently remove everything in trash. */

@@ -87,6 +87,7 @@ ensureColumn('folders', 'category_id', 'INTEGER REFERENCES categories(id)');
 ensureColumn('files', 'category_id', 'INTEGER REFERENCES categories(id)');
 ensureColumn('folders', 'channel_message_id', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('files', 'channel_message_id', 'INTEGER NOT NULL DEFAULT 0');
+ensureColumn('categories', 'access_hash', "TEXT NOT NULL DEFAULT ''");
 
 export default db;
 
@@ -130,10 +131,12 @@ export const setMtSession = (userId, session, phone) =>
     .run(session, phone || '', userId);
 
 /* ---------- categories ---------- */
-export const insertCategory = (userId, name, channelId) =>
+export const insertCategory = (userId, name, channelId, accessHash = '') =>
   db
-    .prepare('INSERT INTO categories (user_id, name, channel_id) VALUES (?,?,?)')
-    .run(userId, name, channelId || '').lastInsertRowid;
+    .prepare(
+      'INSERT INTO categories (user_id, name, channel_id, access_hash) VALUES (?,?,?,?)'
+    )
+    .run(userId, name, channelId || '', String(accessHash || '')).lastInsertRowid;
 
 export const listCategories = (userId) =>
   db.prepare('SELECT * FROM categories WHERE user_id=? ORDER BY name COLLATE NOCASE').all(userId);
@@ -193,6 +196,14 @@ export const setFolderStar = (id, userId, v) =>
 
 export const setFolderTrash = (id, userId, v) =>
   db.prepare('UPDATE folders SET trashed=? WHERE id=? AND user_id=?').run(v ? 1 : 0, id, userId);
+
+/** Count all non-trashed files that live directly inside a folder (non-recursive). */
+export const countFolderItems = (folderId, userId) =>
+  db
+    .prepare(
+      'SELECT COUNT(*) AS count FROM files WHERE user_id=? AND folder_id=? AND trashed=0'
+    )
+    .get(folderId, userId).count;
 
 /** Recursively collect all descendant folder ids (including the folder itself). */
 export function collectFolderIds(id, userId) {
