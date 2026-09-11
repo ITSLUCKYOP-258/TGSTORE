@@ -1,10 +1,16 @@
-import { useCallback } from 'react';
-import { api, uploadFile } from '../api.js';
+import { useCallback, useRef } from 'react';
+import { api, uploadFile, clearToken } from '../api.js';
 
 export function useDashboardHandlers({
   categoryId, folderId, navigate, setUser, setCategories, setCurrentCategory, setCurrentFolder, setFolders, setFiles, setSavedMedia, setLoading, setToast, setUploads, setShowSavedPicker
 }) {
-  const showToast = (msg, isError = false) => { setToast({ msg, isError }); setTimeout(() => setToast(null), 3500); };
+  // Stable ref so useCallback deps don't trigger re-creation on every render
+  const setToastRef = useRef(setToast);
+  setToastRef.current = setToast;
+  const showToast = useCallback((msg, isError = false) => {
+    setToastRef.current({ msg, isError });
+    setTimeout(() => setToastRef.current(null), 3500);
+  }, []);
   
   const loadCategories = useCallback(async () => { try { const { categories } = await api.listCategories(); setCategories(categories); } catch (e) { showToast(e.message, true); } }, []);
   const loadSavedMessages = useCallback(async (filter = 'all') => { try { setLoading(true); const { media } = await api.savedMessages(filter); setSavedMedia(media || []); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, []);
@@ -42,7 +48,9 @@ export function useDashboardHandlers({
   const handleUploadFromComputer = useCallback(async (fileList) => { for (const file of Array.from(fileList)) { const id = `${Date.now()}-${Math.random()}`; setUploads(u => [...u, { id, name: file.name, progress: 0 }]); try { await uploadFile(file, folderId, (p) => setUploads(u => u.map(x => x.id === id ? { ...x, progress: p } : x)), undefined, categoryId); setUploads(u => u.filter(x => x.id !== id)); showToast(`Uploaded ${file.name}`); } catch (e) { setUploads(u => u.map(x => x.id === id ? { ...x, error: e.message } : x)); } } loadCategoryContents(); }, [categoryId, folderId, loadCategoryContents]);
   const handleUploadFromSaved = useCallback(async (selectedMedia) => { if (!categoryId) return; setShowSavedPicker(false); for (const media of selectedMedia) { try { await api.uploadFromSaved(media.id, categoryId, folderId, media.name || 'Saved Media', media.mime || 'application/octet-stream', media.size || 0); showToast(`Uploaded ${media.name || 'media'}`); } catch (e) { showToast(`Failed: ${e.message}`, true); } } loadCategoryContents(); }, [categoryId, folderId, loadCategoryContents]);
   const handleLogout = useCallback(async () => {
-    try { await api.logout(); } catch { /* clear cookie locally even if the call fails */ }
+    try { await api.logout(); } catch { /* clear locally even if the call fails */ }
+    // Clear persisted token for Capacitor native builds
+    clearToken();
     setUser(null);
     navigate('/login');
   }, [navigate, setUser]);

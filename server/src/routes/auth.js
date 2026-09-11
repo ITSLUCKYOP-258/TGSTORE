@@ -23,8 +23,10 @@ router.get('/telegram', (req, res) => {
     return res.status(401).json({ error: 'Telegram login verification failed' });
   }
   const user = upsertTelegramUser(req.query);
-  setAuthCookie(res, signToken(user.id));
-  res.json({ user: publicUser(user) });
+  const token = signToken(user.id);
+  setAuthCookie(res, token);
+  // Return token in body so Capacitor (native) apps can persist it in localStorage
+  res.json({ user: publicUser(user), token });
 });
 
 router.post('/telegram', (req, res) => {
@@ -32,8 +34,9 @@ router.post('/telegram', (req, res) => {
     return res.status(401).json({ error: 'Telegram login verification failed' });
   }
   const user = upsertTelegramUser(req.body);
-  setAuthCookie(res, signToken(user.id));
-  res.json({ user: publicUser(user) });
+  const token = signToken(user.id);
+  setAuthCookie(res, token);
+  res.json({ user: publicUser(user), token });
 });
 
 /** Local development login (enabled with DEV_LOGIN=true in server/.env). */
@@ -42,8 +45,9 @@ router.post('/dev', (req, res) => {
     return res.status(403).json({ error: 'Dev login is disabled' });
   }
   const user = createDevUser(req.body?.name);
-  setAuthCookie(res, signToken(user.id));
-  res.json({ user: publicUser(user) });
+  const token = signToken(user.id);
+  setAuthCookie(res, token);
+  res.json({ user: publicUser(user), token });
 });
 
 router.get('/me', (req, res) => {

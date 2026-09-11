@@ -43,6 +43,11 @@ export default function Dashboard() {
   const [previewItem, setPreviewItem] = useState(null);
   const [toast, setToast] = useState(null);
   const [savedFilter, setSavedFilter] = useState('all');
+  // Mobile sidebar drawer
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Close drawer whenever the user navigates to a different route
+  useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
   const handlers = useDashboardHandlers({
     categoryId, folderId, navigate, setUser, setCategories, setCurrentCategory, setCurrentFolder, setFolders, setFiles, setSavedMedia, setLoading, setToast, setUploads, setShowSavedPicker
@@ -84,12 +89,52 @@ export default function Dashboard() {
   const view = !categoryId ? 'saved' : !folderId ? 'category' : 'folder';
 
   return (
-    <div className="flex h-screen bg-slate-50">
-      <Sidebar user={user} categories={categories} categoryId={categoryId} navigate={navigate} onNewCategory={() => setShowNewCategory(true)} onLogout={handlers.handleLogout} onDeleteCategory={handlers.handleDeleteCategory} />
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {view === 'saved' && <SavedMessagesView loading={loading} savedMedia={savedMedia} savedFilter={savedFilter} setSavedFilter={setSavedFilter} onPreview={setPreviewItem} />}
-        {view === 'category' && <CategoryView loading={loading} category={currentCategory} folders={folders} files={files} navigate={navigate} onNewFolder={openNewFolder} categoryId={categoryId} onUploadFromComputer={handlers.handleUploadFromComputer} onUploadFromSaved={() => setShowSavedPicker(true)} onPreview={setPreviewItem} onDownload={(f) => window.open(downloadUrl(f.id), '_blank')} onDelete={handlers.handleDeleteFile} onDeleteCategory={handlers.handleDeleteCategory} />}
-        {view === 'folder' && <FolderView loading={loading} folderId={folderId} folder={currentFolder} folders={folders} files={files} onUploadFromComputer={handlers.handleUploadFromComputer} onUploadFromSaved={() => setShowSavedPicker(true)} onPreview={setPreviewItem} onDownload={(f) => window.open(downloadUrl(f.id), '_blank')} onDelete={handlers.handleDeleteFile} onDeleteFolder={handlers.handleDeleteFolder} categoryId={categoryId} navigate={navigate} />}
+    <div className="flex h-dvh bg-slate-50">
+      <Sidebar
+        user={user}
+        categories={categories}
+        categoryId={categoryId}
+        navigate={navigate}
+        onNewCategory={() => setShowNewCategory(true)}
+        onLogout={handlers.handleLogout}
+        onDeleteCategory={handlers.handleDeleteCategory}
+        mobileOpen={drawerOpen}
+        onCloseMenu={() => setDrawerOpen(false)}
+      />
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {view === 'saved' && (
+          <SavedMessagesView
+            loading={loading} savedMedia={savedMedia} savedFilter={savedFilter}
+            setSavedFilter={setSavedFilter} onPreview={setPreviewItem}
+            onOpenMenu={() => setDrawerOpen(true)}
+          />
+        )}
+        {view === 'category' && (
+          <CategoryView
+            loading={loading} category={currentCategory} folders={folders} files={files}
+            navigate={navigate} onNewFolder={openNewFolder} categoryId={categoryId}
+            onUploadFromComputer={handlers.handleUploadFromComputer}
+            onUploadFromSaved={() => setShowSavedPicker(true)}
+            onPreview={setPreviewItem}
+            onDownload={(f) => window.open(downloadUrl(f.id), '_blank')}
+            onDelete={handlers.handleDeleteFile}
+            onDeleteCategory={handlers.handleDeleteCategory}
+            onOpenMenu={() => setDrawerOpen(true)}
+          />
+        )}
+        {view === 'folder' && (
+          <FolderView
+            loading={loading} folderId={folderId} folder={currentFolder} folders={folders} files={files}
+            onUploadFromComputer={handlers.handleUploadFromComputer}
+            onUploadFromSaved={() => setShowSavedPicker(true)}
+            onPreview={setPreviewItem}
+            onDownload={(f) => window.open(downloadUrl(f.id), '_blank')}
+            onDelete={handlers.handleDeleteFile}
+            onDeleteFolder={handlers.handleDeleteFolder}
+            categoryId={categoryId} navigate={navigate}
+            onOpenMenu={() => setDrawerOpen(true)}
+          />
+        )}
       </main>
       {showNewCategory && <NewCategoryModal name={newCategoryName} setName={setNewCategoryName} onCreate={() => handleCreateCategory()} onClose={() => setShowNewCategory(false)} />}
       {folderModal.open && <NewFolderModal name={newFolderName} setName={setNewFolderName} onCreate={handleCreateFolder} onClose={() => setFolderModal({ open: false, submitting: false, error: null, success: null })} error={folderModal.error} submitting={folderModal.submitting} success={folderModal.success} hasCategories={categories.length > 0} categoryName={currentCategory?.name} />}

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import * as db from '../db.js';
+import dbInstance, * as db from '../db.js';
 import { requireAuth } from '../auth.js';
 import { postTextMessage } from '../mtproto.js';
 
@@ -46,7 +46,7 @@ router.get('/tree', (req, res) => {
     req.query.categoryId && req.query.categoryId !== 'null'
       ? Number(req.query.categoryId)
       : null;
-  const all = db
+  const all = dbInstance
     .prepare(
       'SELECT id, parent_id, name FROM folders WHERE user_id=? AND trashed=0 AND category_id IS ? ORDER BY name COLLATE NOCASE'
     )

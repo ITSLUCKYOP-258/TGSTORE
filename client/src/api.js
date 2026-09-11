@@ -1,5 +1,22 @@
-/** Small JSON API wrapper — cookies are sent automatically (same-origin / proxied). */
-const BASE = '/api';
+/**
+ * Small JSON API wrapper.
+ * - Browser / PWA: cookies are sent automatically (same-origin / proxied).
+ * - Capacitor (Android / iOS native): cookies don't work cross-origin, so we
+ *   store the JWT in localStorage and send it as an Authorization: Bearer header.
+ */
+
+// When building for Android set VITE_API_BASE_URL=https://yourserver.com
+const BASE = (import.meta.env.VITE_API_BASE_URL ?? '') + '/api';
+
+// ── Token helpers (used by Capacitor native builds) ──────────────────────────
+const TOKEN_KEY = 'tgstore_jwt';
+export const saveToken = (t) => { if (t) localStorage.setItem(TOKEN_KEY, t); };
+export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+const getToken = () => localStorage.getItem(TOKEN_KEY);
+
+// True when running inside a Capacitor Android/iOS shell
+const isNative = () =>
+  typeof window !== 'undefined' && !!window.Capacitor?.isNativePlatform?.();
 
 // Accepts both '/categories' and '/api/categories' (legacy callers pass the full prefix).
 function normalize(path) {
@@ -8,11 +25,14 @@ function normalize(path) {
 }
 
 async function request(path, options = {}) {
+  const token = isNative() ? getToken() : null;
   const res = await fetch(BASE + normalize(path), {
-    credentials: 'include',
+    // cookies only work on same-origin; native builds use Bearer instead
+    credentials: isNative() ? 'omit' : 'include',
     ...options,
     headers: {
       ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
   });
@@ -54,6 +74,9 @@ export const api = {
   createFolder: (name, categoryId, parentId) => request('/folders', { method: 'POST', body: JSON.stringify({ name, categoryId, parentId }) }),
   deleteFolder: (id) => request(`/folders/${id}`, { method: 'DELETE' }),
 
+  // Storage stats
+  storageStats: () => request('/drive/storage'),
+
   // Files
   listFiles: (categoryId, folderId) => request(`/drive?categoryId=${categoryId || ''}&folder=${folderId || ''}`),
   uploadFromSaved: (savedMessageId, categoryId, folderId, name, mime, size) => request('/files/upload-from-saved', { method: 'POST', body: JSON.stringify({ savedMessageId, categoryId, folderId, name, mime, size }) }),
@@ -69,6 +92,9 @@ export function uploadFile(file, folderId, onProgress, signal, categoryId) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', BASE + '/files/upload');
     xhr.responseType = 'json';
+    xhr.withCredentials = !isNative();
+    const token = isNative() ? getToken() : null;
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     const form = new FormData();
     form.append('file', file, file.name);
     form.append('name', file.name);

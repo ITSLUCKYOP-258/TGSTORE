@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api.js';
+import { api, saveToken } from '../api.js';
 
 /**
  * Telegram phone-number login: phone -> OTP code (sent inside Telegram) ->
@@ -75,7 +75,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+911234567890"
-            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
           />
           <button
             disabled={busy}
@@ -95,6 +95,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
               if (d.needPassword) {
                 setStep('password');
               } else {
+                saveToken(d.token);
                 onConnected(d.user);
               }
             });
@@ -126,6 +127,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
             e.preventDefault();
             run(async () => {
               const d = await api.post('/api/mt/verify-password', { flowId, password });
+              saveToken(d.token);
               onConnected(d.user);
             });
           }}
@@ -139,7 +141,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Cloud password"
-            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
           />
           <button
             disabled={busy}

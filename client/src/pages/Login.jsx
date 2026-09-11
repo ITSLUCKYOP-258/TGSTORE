@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api.js';
+import { api, saveToken } from '../api.js';
 import { useAuth } from '../App.jsx';
 import TelegramPhoneLogin from '../components/TelegramPhoneLogin.jsx';
 
@@ -20,6 +20,7 @@ export default function Login() {
       try {
         setBusy(true);
         const data = await api.post('/api/auth/telegram', user);
+        saveToken(data.token);
         setUser(data.user);
       } catch (e) {
         setError(e.message);
@@ -33,6 +34,7 @@ export default function Login() {
     try {
       setBusy(true);
       const data = await api.post('/api/auth/dev', { name: 'Dev User' });
+      saveToken(data.token);
       setUser(data.user);
     } catch (e) {
       setError(e.message);
@@ -58,26 +60,27 @@ export default function Login() {
 
   return (
     <div className="flex min-h-full flex-col lg:flex-row">
-      {/* Left hero */}
-      <div className="relative flex flex-1 flex-col justify-center overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 px-8 py-16 text-white lg:px-16">
+      {/* Left hero — shorter on mobile so the login card stays on screen */}
+      <div className="relative flex flex-1 flex-col justify-center overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 px-8 py-8 text-white sm:py-12 lg:px-16 lg:py-16">
         <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-sky-400/20 blur-2xl" />
         <div className="relative mx-auto w-full max-w-xl">
-          <div className="mb-8 flex items-center gap-3">
+          <div className="mb-6 flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-2xl backdrop-blur">
               ☁️
             </div>
             <span className="text-2xl font-bold tracking-tight">TGStore</span>
           </div>
-          <h1 className="text-4xl font-extrabold leading-tight tracking-tight lg:text-5xl">
+          <h1 className="text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
             Unlimited cloud storage, powered by Telegram.
           </h1>
-          <p className="mt-5 text-lg text-indigo-100">
+          <p className="mt-4 text-base text-indigo-100 sm:mt-5 sm:text-lg">
             Your files are chunked and stored safely on Telegram's infrastructure — no storage
             caps, no metering. A clean drive interface on top: folders, previews, sharing and
             search.
           </p>
-          <ul className="mt-10 grid gap-4 text-sm text-indigo-100 sm:grid-cols-2">
+          {/* Feature chips — hidden on xs so they don't push the login card off screen */}
+          <ul className="mt-8 hidden gap-4 text-sm text-indigo-100 sm:grid sm:grid-cols-2">
             {[
               ['♾️', 'Unlimited storage'],
               ['⚡', 'Fast chunked uploads'],
@@ -96,7 +99,7 @@ export default function Login() {
       </div>
 
       {/* Right: login card */}
-      <div className="flex flex-1 items-center justify-center px-6 py-16">
+      <div className="flex flex-1 items-center justify-center px-6 py-10 lg:py-16">
         <div className="w-full max-w-sm">
           <h2 className="text-2xl font-bold text-slate-900">Sign in</h2>
           <p className="mt-2 text-sm text-slate-500">

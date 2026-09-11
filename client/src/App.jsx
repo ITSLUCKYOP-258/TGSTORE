@@ -16,7 +16,7 @@ export default function App() {
 
   useEffect(() => {
     api.me()
-      .then((u) => setUser(u))
+      .then((data) => setUser(data?.user ?? null))
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);

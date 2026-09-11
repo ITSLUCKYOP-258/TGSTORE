@@ -1,4 +1,4 @@
-/**
+﻿/**
  * First-run configuration store.
  * Lets the owner set Telegram credentials from the web Setup Wizard
  * (server/config.json) instead of editing .env by hand.
@@ -9,7 +9,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONFIG_PATH = path.join(__dirname, '..', 'config.json');
+const CONFIG_PATH = process.env.DATA_DIR
+  ? path.join(process.env.DATA_DIR, 'config.json')
+  : path.join(__dirname, '..', 'config.json');
 
 const ALLOWED_KEYS = [
   'MT_API_ID',
@@ -28,7 +30,7 @@ export function loadFileConfig() {
       if (raw[k] != null && raw[k] !== '') process.env[k] = String(raw[k]);
     }
   } catch {
-    /* no config file yet — .env only */
+    /* no config file yet â€” .env only */
   }
 }
 
