@@ -25,9 +25,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 app.set('trust proxy', 1);
+// Capacitor Android uses capacitor://localhost; iOS uses ionic://localhost
+// Also allow the Vite dev server and any explicitly configured origin.
+const ALLOWED_ORIGINS = new Set(
+  [
+    process.env.CLIENT_ORIGIN,
+    'capacitor://localhost',
+    'ionic://localhost',
+    'http://localhost',
+    'http://localhost:5173',
+    'http://localhost:8787',
+    'http://10.0.2.2:8787', // Android emulator loopback to host
+  ].filter(Boolean)
+);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || true,
+    origin: (origin, cb) => {
+      // No origin = curl / native fetch without CORS headers → allow
+      if (!origin || ALLOWED_ORIGINS.has(origin)) return cb(null, true);
+      // If no specific CLIENT_ORIGIN is set, be permissive (dev mode)
+      if (!process.env.CLIENT_ORIGIN) return cb(null, true);
+      cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
     credentials: true,
   })
 );

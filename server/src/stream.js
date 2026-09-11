@@ -5,6 +5,12 @@ import { getMessage, downloadBytes } from './mtproto.js';
 import { resolveMime } from './mime.js';
 import * as db from './db.js';
 
+/** True when the client disconnected before we finished — not a real error. */
+const isPrematureClose = (err) =>
+  err?.code === 'ERR_STREAM_PREMATURE_CLOSE' ||
+  /premature close/i.test(err?.message || '') ||
+  err?.code === 'ECONNRESET';
+
 /**
  * A chunk stored via the USER's MTProto session has a numeric media id in
  * tg_file_id; legacy Bot-API chunks carry a base64 file_id string instead.
@@ -118,7 +124,7 @@ export function serveFileStream(chunks, file, req, res, { asAttachment, userId }
       Readable.from(telegramFileBytes(userId, chunks, file, { start, end })),
       res
     ).catch((err) => {
-      if (!res.writableEnded) console.error('stream error:', err.message);
+      if (!res.writableEnded && !isPrematureClose(err)) console.error('stream error:', err.message);
       res.end();
     });
   }
@@ -126,7 +132,7 @@ export function serveFileStream(chunks, file, req, res, { asAttachment, userId }
   res.writeHead(200, { ...baseHeaders, 'Content-Length': size });
   if (req.method === 'HEAD') return res.end();
   return pipeline(Readable.from(source()), res).catch((err) => {
-    if (!res.writableEnded) console.error('stream error:', err.message);
+    if (!res.writableEnded && !isPrematureClose(err)) console.error('stream error:', err.message);
     res.end();
   });
 }

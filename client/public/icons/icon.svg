@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#4f46e5"/>
+  <!-- Cloud shape -->
+  <path d="M160 320 a80 80 0 0 1 0-160 a80 80 0 0 1 156-24 a64 64 0 0 1 8 128 Z"
+        fill="white" opacity="0.95"/>
+  <!-- Telegram arrow -->
+  <path d="M200 272 l96-48 l-24 80 l-28-28 l-44 28 Z" fill="#4f46e5"/>
+  <path d="M224 276 l44-20 l-16 56 Z" fill="#3730a3"/>
+</svg>

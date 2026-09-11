@@ -1,9 +1,10 @@
-import Database from 'better-sqlite3';
+﻿import Database from 'better-sqlite3';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const db = new Database(path.join(__dirname, '..', 'tgstore.db'));
+const dataDir = process.env.DATA_DIR || path.join(__dirname, '..');
+const db = new Database(path.join(dataDir, 'tgstore.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
@@ -173,7 +174,12 @@ export const getFolder = (id, userId) =>
 export const listFolders = (userId, categoryId, parentId) =>
   db
     .prepare(
-      `SELECT * FROM folders WHERE user_id=? AND trashed=0 AND category_id IS ? AND parent_id IS ? ORDER BY name COLLATE NOCASE`
+      `SELECT f.*,
+         (SELECT COUNT(*) FROM files fi WHERE fi.folder_id=f.id AND fi.user_id=f.user_id AND fi.trashed=0) AS itemCount,
+         (SELECT COALESCE(SUM(fi.size),0) FROM files fi WHERE fi.folder_id=f.id AND fi.user_id=f.user_id AND fi.trashed=0) AS totalSize
+       FROM folders f
+       WHERE f.user_id=? AND f.trashed=0 AND f.category_id IS ? AND f.parent_id IS ?
+       ORDER BY f.name COLLATE NOCASE`
     )
     .all(userId, categoryId ?? null, parentId ?? null);
 

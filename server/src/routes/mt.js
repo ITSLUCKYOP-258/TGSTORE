@@ -35,8 +35,11 @@ async function completeLogin(res, me, session, phone) {
     photo_url: '',
   });
   await saveUserSession(user.id, session, phone);
-  setAuthCookie(res, signToken(user.id));
+  const token = signToken(user.id);
+  setAuthCookie(res, token);
   return {
+    // Return token in body so Capacitor (native) apps can persist it
+    token,
     user: {
       id: user.id,
       name: [me.firstName, me.lastName].filter(Boolean).join(' ') || 'Telegram User',

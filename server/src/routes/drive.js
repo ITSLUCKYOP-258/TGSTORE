@@ -22,6 +22,8 @@ const shapeFolder = (f) => ({
   trashed: !!f.trashed,
   createdAt: f.created_at,
   type: 'folder',
+  itemCount: f.itemCount ?? 0,
+  totalSize: f.totalSize ?? 0,
 });
 
 /** GET /?categoryId=<id>&folder=<id|null>&view=drive|starred|trash|search&q=... */
