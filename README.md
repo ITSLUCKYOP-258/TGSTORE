@@ -1,4 +1,4 @@
-# TGStore — Unlimited Cloud Drive Powered by Telegram
+# TGStore — Unlimited Cloud Drive Powered by TGSTORE
 
 A full-stack web app that gives you a Google-Drive-style interface on top of **Telegram's infrastructure** as unlimited storage. Two storage modes:
 
