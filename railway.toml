@@ -1,9 +1,8 @@
-﻿[build]
-  builder = "nixpacks"
-  buildCommand = "cd client && npm ci && npm run build && cd ../server && npm ci"
+[build]
+builder = "nixpacks"
 
 [deploy]
-  startCommand = "node server/src/index.js"
-  healthcheckPath = "/api/health"
-  restartPolicyType = "on_failure"
-  restartPolicyMaxRetries = 3
+startCommand = "node server/src/index.js"
+healthcheckPath = "/api/health"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

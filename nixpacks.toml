@@ -1,11 +1,11 @@
-﻿[phases.setup]
-  nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
+[phases.setup]
+nixPkgs = ["nodejs_20"]
+
+[phases.install]
+cmds = ["npm ci --prefix server", "npm ci --prefix client"]
 
 [phases.build]
-  cmds = [
-    "cd client && npm ci && npm run build",
-    "cd server && npm ci"
-  ]
+cmds = ["npm run build --prefix client"]
 
 [start]
-  cmd = "node server/src/index.js"
+cmd = "node server/src/index.js"
