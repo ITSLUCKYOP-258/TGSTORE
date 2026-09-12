@@ -48,7 +48,8 @@ function Thumb({ item }) {
     );
   }
   const ic = fileIcon(item);
-  const isImage = (item.mime || '').startsWith('image/');
+  // E2EE files store ciphertext at /raw — never render it as an image.
+  const isImage = (item.mime || '').startsWith('image/') && !item.encrypted;
   return (
     <div
       className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ${ic.color}`}

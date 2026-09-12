@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api, saveToken } from '../api.js';
 
 /**
@@ -36,12 +35,10 @@ export default function TelegramPhoneLogin({ onConnected }) {
   if (enabled === false) {
     return (
       <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">
-        Phone login is disabled. Configure your Telegram <b>api_id</b> & <b>api_hash</b> (from{' '}
-        <b>my.telegram.org → API development tools</b>) once in the{' '}
-        <Link to="/setup" className="font-semibold text-indigo-600 hover:underline">
-          Setup Wizard
-        </Link>{' '}
-        — after that, logging in is just phone number + code.
+        Phone login is disabled. Ask the server owner to set <b>MT_API_ID</b> &amp;{' '}
+        <b>MT_API_HASH</b> environment variables on the server (from{' '}
+        <b>my.telegram.org → API development tools</b>) — after that, logging in is just phone
+        number + code.
       </div>
     );
   }

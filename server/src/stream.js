@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { getFilePath, fileDownloadUrl } from './telegram.js';
+import { getFilePath, invalidateFilePath, fileDownloadUrl } from './telegram.js';
 import { getMessage, downloadBytes } from './mtproto.js';
 import { resolveMime } from './mime.js';
 import * as db from './db.js';
@@ -54,8 +54,15 @@ export async function* telegramFileBytes(userId, chunks, file, { start = 0, end 
         for await (const buf of mtChunkBytes(userId, c, file, { skip, length })) yield buf;
       } else {
         // ---- legacy path: Bot API chunks stored in the shared storage channel
-        const fp = await getFilePath(c.tg_file_id);
-        const upstream = await fetch(fileDownloadUrl(fp));
+        // A freshly-uploaded file can briefly 404 on Telegram's CDN with the
+        // premature file_path — on failure, drop the cached path, resolve a
+        // fresh one via getFile and retry once before giving up.
+        const fetchChunk = () => getFilePath(c.tg_file_id).then((fp) => fetch(fileDownloadUrl(fp)));
+        let upstream = await fetchChunk();
+        if (!upstream.ok) {
+          invalidateFilePath(c.tg_file_id);
+          upstream = await fetchChunk();
+        }
         if (!upstream.ok) throw new Error(`Telegram file fetch failed: ${upstream.status}`);
         const nodeStream = Readable.fromWeb(upstream.body);
         let rskip = skip;

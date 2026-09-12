@@ -1,9 +1,15 @@
 import { useCallback, useRef } from 'react';
 import { api, uploadFile, clearToken } from '../api.js';
+import { useVault } from './useVault';
+import { encryptFile, encryptMetadata } from '../lib/crypto';
+import { withDecryptedMeta } from '../lib/vault.js';
 
 export function useDashboardHandlers({
   categoryId, folderId, navigate, setUser, setCategories, setCurrentCategory, setCurrentFolder, setFolders, setFiles, setSavedMedia, setLoading, setToast, setUploads, setShowSavedPicker
 }) {
+  // Vault context — safe to call: invoked during Dashboard's render.
+  // Methods read a module-level key, so closures stay stable across renders.
+  const vault = useVault();
   // Stable ref so useCallback deps don't trigger re-creation on every render
   const setToastRef = useRef(setToast);
   setToastRef.current = setToast;
@@ -14,7 +20,7 @@ export function useDashboardHandlers({
   
   const loadCategories = useCallback(async () => { try { const { categories } = await api.listCategories(); setCategories(categories); } catch (e) { showToast(e.message, true); } }, []);
   const loadSavedMessages = useCallback(async (filter = 'all') => { try { setLoading(true); const { media } = await api.savedMessages(filter); setSavedMedia(media || []); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, []);
-  const loadCategoryContents = useCallback(async () => { if (!categoryId) return; try { setLoading(true); const cats = await api.listCategories(); setCurrentCategory(cats.categories.find(c => c.id === categoryId)); const { folders, currentFolder } = await api.listFolders(categoryId, folderId || null); setFolders(folders || []); setCurrentFolder(currentFolder || null); const { files } = await api.listFiles(categoryId, folderId || null); setFiles(files || []); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, [categoryId, folderId]);
+  const loadCategoryContents = useCallback(async () => { if (!categoryId) return; try { setLoading(true); const cats = await api.listCategories(); setCurrentCategory(cats.categories.find(c => c.id === categoryId)); const { folders, currentFolder } = await api.listFolders(categoryId, folderId || null); setFolders(folders || []); setCurrentFolder(currentFolder || null); const { files } = await api.listFiles(categoryId, folderId || null); setFiles(await withDecryptedMeta(files || [], vault.getKey())); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, [categoryId, folderId]);
 
   const handleCreateCategory = useCallback(async (name) => {
     if (!name?.trim()) { showToast('Category name is required', true); return; }
@@ -45,12 +51,40 @@ export function useDashboardHandlers({
       return { ok: false, error: e.message };
     }
   }, [categoryId, folderId, loadCategoryContents]);
-  const handleUploadFromComputer = useCallback(async (fileList) => { for (const file of Array.from(fileList)) { const id = `${Date.now()}-${Math.random()}`; setUploads(u => [...u, { id, name: file.name, progress: 0 }]); try { await uploadFile(file, folderId, (p) => setUploads(u => u.map(x => x.id === id ? { ...x, progress: p } : x)), undefined, categoryId); setUploads(u => u.filter(x => x.id !== id)); showToast(`Uploaded ${file.name}`); } catch (e) { setUploads(u => u.map(x => x.id === id ? { ...x, error: e.message } : x)); } } loadCategoryContents(); }, [categoryId, folderId, loadCategoryContents]);
+  const handleUploadFromComputer = useCallback(async (fileList) => {
+    const key = vault.getKey();
+    for (const file of Array.from(fileList)) {
+      const id = `${Date.now()}-${Math.random()}`;
+      setUploads(u => [...u, { id, name: file.name, progress: 0 }]);
+      try {
+        let blob = file;
+        let nameArmor = null;
+        if (key) {
+          // E2EE: encrypt the bytes now — Telegram/server only ever see
+          // ciphertext; the real name/mime/size ride inside armored meta.
+          const { encrypted } = await encryptFile(file, key);
+          blob = encrypted;
+          nameArmor = await encryptMetadata(
+            { name: file.name, mime: file.type || 'application/octet-stream', size: file.size },
+            key
+          );
+        }
+        await uploadFile(blob, folderId, (p) => setUploads(u => u.map(x => x.id === id ? { ...x, progress: p } : x)), undefined, categoryId, nameArmor);
+        setUploads(u => u.filter(x => x.id !== id));
+        showToast(`Uploaded ${file.name}`);
+      } catch (e) {
+        setUploads(u => u.map(x => x.id === id ? { ...x, error: e.message } : x));
+      }
+    }
+    loadCategoryContents();
+  }, [categoryId, folderId, loadCategoryContents]);
   const handleUploadFromSaved = useCallback(async (selectedMedia) => { if (!categoryId) return; setShowSavedPicker(false); for (const media of selectedMedia) { try { await api.uploadFromSaved(media.id, categoryId, folderId, media.name || 'Saved Media', media.mime || 'application/octet-stream', media.size || 0); showToast(`Uploaded ${media.name || 'media'}`); } catch (e) { showToast(`Failed: ${e.message}`, true); } } loadCategoryContents(); }, [categoryId, folderId, loadCategoryContents]);
   const handleLogout = useCallback(async () => {
     try { await api.logout(); } catch { /* clear locally even if the call fails */ }
     // Clear persisted token for Capacitor native builds
     clearToken();
+    // Drop the vault key from this session's memory
+    vault.lock();
     setUser(null);
     navigate('/login');
   }, [navigate, setUser]);

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { rawUrl } from '../api.js';
+import { useVault } from '../hooks/useVault';
+import { decryptToObjectUrl } from '../lib/vault.js';
 
 function previewExt(name) {
   return String(name || '').split('.').pop().toLowerCase();
@@ -147,9 +149,28 @@ function PdfViewer({ src }) {
 }
 
 export default function MediaPreview({ item, onClose }) {
+  const vault = useVault();
+  // Decrypted object URL for E2EE files (null until resolved)
+  const [decUrl, setDecUrl] = useState(null);
+
+  useEffect(() => {
+    setDecUrl(null);
+    if (!item?.encrypted || !item?.id) return undefined;
+    const key = vault.getKey();
+    if (!key) return undefined;
+    let active = true;
+    decryptToObjectUrl(item, key)
+      .then((h) => {
+        if (!active) { h?.revoke?.(); return; }
+        setDecUrl(h);
+      })
+      .catch(() => { /* decrypt failed — fall back below */ });
+    return () => { active = false; };
+  }, [item?.id, item?.encrypted]);
+
   if (!item) return null;
   const kind = previewKind(item);
-  const src = previewSrc(item);
+  const src = decUrl?.url || previewSrc(item);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/85 sm:items-center" onClick={onClose}>
@@ -206,7 +227,7 @@ export default function MediaPreview({ item, onClose }) {
             )}
           </div>
           <a
-            href={item.downloadUrl || `/api/files/${item.id}/download`}
+            href={(item.encrypted && decUrl?.url) || item.downloadUrl || `/api/files/${item.id}/download`}
             download={item.name}
             className="min-h-11 flex-shrink-0 rounded-lg bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20 transition"
           >⬇ Download</a>

@@ -32,6 +32,12 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
   try {
     const name = String(req.body?.name || req.file.originalname || 'untitled');
     const mime = String(req.body?.mime || req.file.mimetype || 'application/octet-stream');
+    // E2EE (zero-knowledge): the client may send an armored encrypted-metadata
+    // string ("TGS1:…") as `name`. It is persisted verbatim in our DB, but the
+    // Telegram-facing filename/caption must stay neutral so nothing readable
+    // ever reaches Telegram.
+    const isEncrypted = name.startsWith('TGS1:');
+    const tgName = isEncrypted ? 'file.bin' : name;
     const categoryId =
       req.body?.categoryId && req.body.categoryId !== 'null'
         ? Number(req.body.categoryId)
@@ -75,11 +81,11 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
       );
       const result = await sendFileToChannel(req.userId, category.channel_id, category.access_hash, {
         file: filePath, // stream from disk — memory-safe for large files
-        filename: name,
+        filename: tgName,
         mime,
         fileSize: size,
         replyToMessageId: replyTo,
-        caption: `📎 ${name}`,
+        caption: `📎 ${tgName}`,
       });
       console.log(
         `[files/upload] stored in USER channel messageId=${result.messageId} mediaId=${result.fileId}`
@@ -111,7 +117,7 @@ router.post('/upload', requireAuth, upload.single('file'), async (req, res) => {
           const length = Math.min(chunkSize, size - start);
           const buf = Buffer.alloc(length);
           await fd.read(buf, 0, length, start);
-          const stored = await sendChunkToChannel(buf, idx, total, name, targetChannelId);
+          const stored = await sendChunkToChannel(buf, idx, total, tgName, targetChannelId);
           chunks.push(stored);
           if (idx === 0) channelMessageId = stored.messageId;
         }
