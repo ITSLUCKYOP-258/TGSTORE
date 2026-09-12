@@ -1,5 +1,7 @@
-﻿# ---- Stage 1: Build frontend ----
+# ---- Stage 1: Build frontend ----
 FROM node:20-slim AS frontend
+# Build tools needed for native deps in devDependencies (e.g. sharp)
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/client
 COPY client/package.json client/package-lock.json ./
 RUN npm ci
