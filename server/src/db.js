@@ -84,6 +84,7 @@ function ensureColumn(table, column, ddl) {
 }
 ensureColumn('users', 'mt_session', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('users', 'mt_phone', "TEXT NOT NULL DEFAULT ''");
+ensureColumn('users', 'last_login', 'TEXT');
 ensureColumn('folders', 'category_id', 'INTEGER REFERENCES categories(id)');
 ensureColumn('files', 'category_id', 'INTEGER REFERENCES categories(id)');
 ensureColumn('folders', 'channel_message_id', 'INTEGER NOT NULL DEFAULT 0');
@@ -99,13 +100,13 @@ export const upsertTelegramUser = db.transaction((u) => {
     .get(String(u.id));
   if (existing) {
     db.prepare(
-      `UPDATE users SET first_name=?, last_name=?, username=?, photo_url=? WHERE id=?`
+      `UPDATE users SET first_name=?, last_name=?, username=?, photo_url=?, last_login=datetime('now') WHERE id=?`
     ).run(u.first_name || '', u.last_name || '', u.username || '', u.photo_url || '', existing.id);
     return db.prepare('SELECT * FROM users WHERE id=?').get(existing.id);
   }
   const info = db
     .prepare(
-      `INSERT INTO users (tg_id, first_name, last_name, username, photo_url) VALUES (?,?,?,?,?)`
+      `INSERT INTO users (tg_id, first_name, last_name, username, photo_url, last_login) VALUES (?,?,?,?,?,datetime('now'))`
     )
     .run(String(u.id), u.first_name || '', u.last_name || '', u.username || '', u.photo_url || '');
   return db.prepare('SELECT * FROM users WHERE id=?').get(info.lastInsertRowid);
@@ -116,15 +117,52 @@ export const createDevUser = db.transaction((name) => {
   const existing = db
     .prepare('SELECT * FROM users WHERE is_dev=1 ORDER BY id LIMIT 1')
     .get();
-  if (existing) return existing;
+  if (existing) {
+    db.prepare(`UPDATE users SET last_login=datetime('now') WHERE id=?`).run(existing.id);
+    return existing;
+  }
   const info = db
-    .prepare(`INSERT INTO users (first_name, is_dev) VALUES (?, 1)`)
+    .prepare(`INSERT INTO users (first_name, is_dev, last_login) VALUES (?, 1, datetime('now'))`)
     .run(name || 'Dev User');
   return db.prepare('SELECT * FROM users WHERE id=?').get(info.lastInsertRowid);
 });
 
 export const getUserById = (id) =>
   db.prepare('SELECT * FROM users WHERE id=?').get(id);
+
+/** Every account that has ever logged in — for the admin API (no secrets).
+ *  Includes per-user file count + storage used (ciphertext bytes). */
+export const listUsers = () =>
+  db
+    .prepare(
+      `SELECT u.id, u.tg_id, u.first_name, u.last_name, u.username, u.photo_url, u.is_dev,
+              (u.mt_session != '') AS telegram_connected, u.mt_phone, u.last_login, u.created_at,
+              COALESCE(f.file_count, 0)    AS file_count,
+              COALESCE(f.storage_bytes, 0) AS storage_bytes
+       FROM users u
+       LEFT JOIN (
+         SELECT user_id, COUNT(*) AS file_count, COALESCE(SUM(size), 0) AS storage_bytes
+         FROM files WHERE trashed = 0 GROUP BY user_id
+       ) f ON f.user_id = u.id
+       ORDER BY u.last_login DESC`
+    )
+    .all();
+
+/** Aggregate stats for the admin API. */
+export const getUserStats = () => {
+  const totals = db
+    .prepare(
+      `SELECT COUNT(*) AS total_users,
+              SUM(CASE WHEN mt_session != '' THEN 1 ELSE 0 END) AS telegram_connected,
+              SUM(CASE WHEN last_login >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS active_last_24h
+       FROM users`
+    )
+    .get();
+  const files = db
+    .prepare(`SELECT COUNT(*) AS total_files, COALESCE(SUM(size),0) AS total_bytes FROM files WHERE trashed=0`)
+    .get();
+  return { ...totals, ...files };
+};
 
 export const setMtSession = (userId, session, phone) =>
   db

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { attachUser } from './auth.js';
 import { loadFileConfig } from './config.js';
 import authRoutes from './routes/auth.js';
-import setupRoutes from './routes/setup.js';
+import adminRoutes from './routes/admin.js';
 import categoriesRoutes from './routes/categories.js';
 import foldersRoutes from './routes/folders.js';
 import driveRoutes from './routes/drive.js';
@@ -18,7 +18,7 @@ import mtRoutes from './routes/mt.js';
 import { healthCheck, getChunkSize } from './telegram.js';
 import { isConfigured as mtConfigured } from './mtproto.js';
 
-// config.json (Setup Wizard) overrides .env — apply before anything reads env
+// config.json (optional self-host override) — apply before anything reads env
 loadFileConfig();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -80,7 +80,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
-app.use('/api/setup', setupRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/folders', foldersRoutes);
 app.use('/api/drive', driveRoutes);

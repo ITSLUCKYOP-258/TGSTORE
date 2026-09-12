@@ -72,6 +72,11 @@ export async function deleteStoredMessage(chatId, messageId) {
 const pathCache = new Map(); // file_id -> { path, expires }
 const PATH_TTL = 40 * 60 * 1000;
 
+/** Drop a cached file_path — used when Telegram's CDN 404s a premature path. */
+export function invalidateFilePath(tgFileId) {
+  pathCache.delete(tgFileId);
+}
+
 export async function getFilePath(tgFileId) {
   const cached = pathCache.get(tgFileId);
   if (cached && cached.expires > Date.now()) return cached.path;

@@ -85,9 +85,11 @@ export const api = {
 
 /**
  * Upload with progress via XHR (fetch has no upload progress).
- * Returns a promise resolving to { file }.
+ * When `metaArmor` (an "TGS1:" encrypted-metadata string) is provided the
+ * upload is E2EE: `file` is already the ciphertext blob and the armored
+ * string travels in the `name` field. Returns a promise resolving to { file }.
  */
-export function uploadFile(file, folderId, onProgress, signal, categoryId) {
+export function uploadFile(file, folderId, onProgress, signal, categoryId, metaArmor) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', BASE + '/files/upload');
@@ -96,9 +98,10 @@ export function uploadFile(file, folderId, onProgress, signal, categoryId) {
     const token = isNative() ? getToken() : null;
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     const form = new FormData();
-    form.append('file', file, file.name);
-    form.append('name', file.name);
-    form.append('mime', file.type || 'application/octet-stream');
+    form.append('file', file, file.name || 'file');
+    form.append('name', metaArmor || file.name);
+    // Encrypted payloads are always opaque bytes — never leak the real MIME.
+    form.append('mime', metaArmor ? 'application/octet-stream' : file.type || 'application/octet-stream');
     if (categoryId != null) form.append('categoryId', String(categoryId));
     if (folderId != null) form.append('folderId', String(folderId));
     xhr.upload.onprogress = (e) => {
@@ -119,3 +122,7 @@ export function uploadFile(file, folderId, onProgress, signal, categoryId) {
 
 export const downloadUrl = (id) => `${BASE}/files/${id}/download`;
 export const rawUrl = (id) => `${BASE}/files/${id}/raw`;
+
+// ── Admin (hidden /admin page — endpoints require the x-admin-key header) ──
+export const adminStats = (adminKey) => request('/admin/stats', { headers: { 'x-admin-key': adminKey } });
+export const adminUsers = (adminKey) => request('/admin/users', { headers: { 'x-admin-key': adminKey } });

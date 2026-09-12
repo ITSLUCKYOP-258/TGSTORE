@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { api, saveToken } from '../api.js';
 import { useAuth } from '../App.jsx';
 import TelegramPhoneLogin from '../components/TelegramPhoneLogin.jsx';
@@ -118,13 +117,6 @@ export default function Login() {
                 below for local development.
               </div>
             )}
-
-            <Link
-              to="/setup"
-              className="text-center text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:underline"
-            >
-              ⚙ Server owner? Run the one-time Setup Wizard
-            </Link>
 
             {config?.devLoginEnabled && (
               <button

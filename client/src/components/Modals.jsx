@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api, rawUrl } from '../api.js';
 import { formatBytes, fileKind } from '../lib/format.js';
+import { useVault } from '../hooks/useVault';
+import { decryptToObjectUrl } from '../lib/vault.js';
 
 export function ModalShell({ title, onClose, children, wide }) {
   useEffect(() => {
@@ -244,7 +246,23 @@ export function ShareModal({ file, onClose }) {
 
 export function PreviewModal({ file, onClose }) {
   const kind = fileKind(file);
-  const src = rawUrl(file.id);
+  const vault = useVault();
+  const [decUrl, setDecUrl] = useState(null);
+
+  // E2EE: resolve decrypted bytes for encrypted stored files
+  useEffect(() => {
+    setDecUrl(null);
+    if (!file?.encrypted || !file?.id) return undefined;
+    const key = vault.getKey();
+    if (!key) return undefined;
+    let active = true;
+    decryptToObjectUrl(file, key)
+      .then((h) => { if (active) setDecUrl(h); else h?.revoke?.(); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [file?.id, file?.encrypted]);
+
+  const src = decUrl?.url || rawUrl(file.id);
   const [text, setText] = useState(null);
 
   useEffect(() => {
@@ -263,7 +281,8 @@ export function PreviewModal({ file, onClose }) {
           {file.mime} · {formatBytes(file.size)}
         </span>
         <a
-          href={`/api/files/${file.id}/download`}
+          href={(file.encrypted && decUrl?.url) || `/api/files/${file.id}/download`}
+          download={file.name}
           className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
         >
           ⬇ Download

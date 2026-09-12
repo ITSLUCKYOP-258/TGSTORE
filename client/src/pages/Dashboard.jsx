@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { api, uploadFile, downloadUrl } from '../api.js';
+import { api, uploadFile } from '../api.js';
+import { useVault } from '../hooks/useVault';
+import { downloadDecrypted } from '../lib/vault.js';
 import { useAuth } from '../App.jsx';
 import Sidebar from '../components/Sidebar.jsx';
 import MediaPreview from '../components/MediaPreview.jsx';
@@ -16,6 +18,7 @@ import { useDashboardHandlers } from '../hooks/useDashboardHandlers.js';
 
 export default function Dashboard() {
   const { user, setUser } = useAuth();
+  const vault = useVault();
   const navigate = useNavigate();
   const location = useLocation();
   // NOTE: Dashboard is mounted on the wildcard route "/app/*", so useParams()
@@ -52,6 +55,21 @@ export default function Dashboard() {
   const handlers = useDashboardHandlers({
     categoryId, folderId, navigate, setUser, setCategories, setCurrentCategory, setCurrentFolder, setFolders, setFiles, setSavedMedia, setLoading, setToast, setUploads, setShowSavedPicker
   });
+
+  // E2EE-aware download: encrypted files are fetched + decrypted in the
+  // browser; legacy plaintext files keep the direct streaming link.
+  const handleDownload = async (f) => {
+    const key = vault.getKey();
+    if (f?.encrypted) {
+      if (!key) {
+        setToast({ msg: 'Vault locked — unlock it to download this file', isError: true });
+        setTimeout(() => setToast(null), 3500);
+        return;
+      }
+      if (await downloadDecrypted(f, key)) return;
+    }
+    window.open(`/api/files/${f.id}/download`, '_blank');
+  };
 
   useEffect(() => { handlers.loadCategories(); }, [handlers.loadCategories]);
   useEffect(() => {
@@ -116,7 +134,7 @@ export default function Dashboard() {
             onUploadFromComputer={handlers.handleUploadFromComputer}
             onUploadFromSaved={() => setShowSavedPicker(true)}
             onPreview={setPreviewItem}
-            onDownload={(f) => window.open(downloadUrl(f.id), '_blank')}
+            onDownload={handleDownload}
             onDelete={handlers.handleDeleteFile}
             onDeleteCategory={handlers.handleDeleteCategory}
             onOpenMenu={() => setDrawerOpen(true)}
@@ -128,7 +146,7 @@ export default function Dashboard() {
             onUploadFromComputer={handlers.handleUploadFromComputer}
             onUploadFromSaved={() => setShowSavedPicker(true)}
             onPreview={setPreviewItem}
-            onDownload={(f) => window.open(downloadUrl(f.id), '_blank')}
+            onDownload={handleDownload}
             onDelete={handlers.handleDeleteFile}
             onDeleteFolder={handlers.handleDeleteFolder}
             categoryId={categoryId} navigate={navigate}

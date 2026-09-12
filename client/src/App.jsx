@@ -1,10 +1,12 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useLocation, BrowserRouter } from 'react-router-dom';
 import { api } from './api.js';
+import { VaultProvider } from './hooks/useVault';
 import Login from './pages/Login.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import ShareView from './pages/ShareView.jsx';
-import Setup from './pages/Setup.jsx';
+import Admin from './pages/Admin.jsx';
+import VaultGate from './components/VaultGate.jsx';
 
 const AuthContext = createContext({ user: null, loading: true, setUser: () => {} });
 export const useAuth = () => useContext(AuthContext);
@@ -36,19 +38,31 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={auth}>
-      <Routes>
-        <Route
-          path="/login"
-          element={user ? <Navigate to="/app" replace /> : <Login />}
-        />
-        <Route
-          path="/app/*"
-          element={user ? <Dashboard /> : <Navigate to="/login" replace state={{ from: location }} />}
-        />
-        <Route path="/s/:token" element={<ShareView />} />
-        <Route path="/setup" element={<Setup />} />
-        <Route path="*" element={<Navigate to={user ? '/app' : '/login'} replace />} />
-      </Routes>
+      <VaultProvider>
+        <Routes>
+          <Route
+            path="/login"
+            element={user ? <Navigate to="/app" replace /> : <Login />}
+          />
+          <Route
+            path="/app/*"
+            element={
+              user ? (
+                <VaultGate>
+                  <Dashboard />
+                </VaultGate>
+              ) : (
+                <Navigate to="/login" replace state={{ from: location }} />
+              )
+            }
+          />
+          <Route path="/s/:token" element={<ShareView />} />
+          {/* Hidden admin dashboard — NO links/buttons anywhere; URL-only access.
+              Security is enforced server-side by the x-admin-key header. */}
+          <Route path="/admin" element={<Admin />} />
+          <Route path="*" element={<Navigate to={user ? '/app' : '/login'} replace />} />
+        </Routes>
+      </VaultProvider>
     </AuthContext.Provider>
   );
 }

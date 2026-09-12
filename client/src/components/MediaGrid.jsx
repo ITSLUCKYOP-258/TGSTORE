@@ -1,3 +1,66 @@
+import { useEffect, useRef, useState } from 'react';
+import { rawUrl } from '../api.js';
+import { useVault } from '../hooks/useVault';
+import { decryptFile } from '../lib/crypto';
+
+/**
+ * E2EE thumbnail: lazily fetches the stored ciphertext when the tile
+ * scrolls into view, decrypts it in the browser with the vault key and
+ * renders the real image via a temporary object URL. Telegram/server only
+ * ever see ciphertext; the plaintext exists only in this tab's memory.
+ */
+function SecureThumb({ item, fallback }) {
+  const vault = useVault();
+  const [url, setUrl] = useState(null);
+  const holder = useRef(null);
+  const started = useRef(false);
+  const createdUrl = useRef(null);
+
+  useEffect(() => {
+    const el = holder.current;
+    if (!el) return undefined;
+    const start = () => {
+      if (started.current) return;
+      started.current = true;
+      const key = vault.getKey();
+      if (!key) return; // vault locked — icon stays
+      fetch(rawUrl(item.id), { credentials: 'include' })
+        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('raw fetch failed'))))
+        .then((cipher) => decryptFile(cipher, key))
+        .then((plain) => {
+          const u = URL.createObjectURL(new Blob([plain], { type: item.mime || 'application/octet-stream' }));
+          createdUrl.current = u;
+          setUrl(u);
+        })
+        .catch(() => { /* keep icon fallback */ });
+    };
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          start();
+          io.disconnect();
+        }
+      },
+      { rootMargin: '300px' } // start slightly before the tile is visible
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      if (createdUrl.current) URL.revokeObjectURL(createdUrl.current);
+    };
+  }, [item.id]);
+
+  return (
+    <div ref={holder} className="absolute inset-0 flex h-full w-full items-center justify-center">
+      {url ? (
+        <img src={url} alt={item.name || ''} className="h-full w-full object-cover" />
+      ) : (
+        <span className="text-4xl">{fallback}</span>
+      )}
+    </div>
+  );
+}
+
 export default function MediaGrid({ media, onPreview, onDownload, onDelete, showSavedBadge }) {
   if (!media || media.length === 0) {
     return (
@@ -16,20 +79,27 @@ export default function MediaGrid({ media, onPreview, onDownload, onDelete, show
           className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition hover:border-indigo-300 hover:shadow-md"
           onClick={() => onPreview?.(item)}
         >
-          {/* Icon fallback (always rendered underneath) */}
-          <div className="flex h-full w-full items-center justify-center text-4xl">
-            {gridIcon(item)}
-          </div>
+          {item.encrypted && item.id && gridKind(item) === 'image' ? (
+            /* E2EE image: decrypt-on-scroll thumbnail — Telegram never sees it */
+            <SecureThumb item={item} fallback={gridIcon(item)} />
+          ) : (
+            <>
+              {/* Icon fallback (always rendered underneath) */}
+              <div className="flex h-full w-full items-center justify-center text-4xl">
+                {gridIcon(item)}
+              </div>
 
-          {/* Real thumbnail on top — removes itself on load error to reveal the icon */}
-          {item.thumbnail && (
-            <img
-              src={item.thumbnail}
-              alt={item.name}
-              loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover"
-              onError={(e) => e.currentTarget.remove()}
-            />
+              {/* Real thumbnail on top — removes itself on load error to reveal the icon */}
+              {item.thumbnail && (
+                <img
+                  src={item.thumbnail}
+                  alt={item.name}
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => e.currentTarget.remove()}
+                />
+              )}
+            </>
           )}
 
           {/* Overlay: always visible on mobile, hover-reveal on md+ */}
