@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TGStore - Vault session management (useVault.ts)
  *
  * React context + hook that tracks vault STATE (locked / unlocking /

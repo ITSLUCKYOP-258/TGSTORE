@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Optional config.json override (used by some self-hosted setups).
  * If DATA_DIR/config.json exists, its values are applied on top of .env
  * at startup. There is NO web wizard anymore — configuration is done

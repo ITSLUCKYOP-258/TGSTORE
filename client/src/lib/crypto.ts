@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TGStore - Zero-Knowledge Client-Side E2EE (crypto.ts)
  *
  * Everything here runs in the user's browser via the Web Crypto API

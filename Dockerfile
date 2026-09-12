@@ -1,4 +1,4 @@
-﻿# ---- Stage 1: Build frontend ----
+# ---- Stage 1: Build frontend ----
 FROM node:20-slim AS frontend
 WORKDIR /app/client
 COPY client/package.json client/package-lock.json ./
