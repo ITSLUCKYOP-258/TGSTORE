@@ -8,13 +8,21 @@
     buildCommand: npm ci && cd ../client && npm ci && npm run build && cd ../server
     startCommand: node src/index.js
     healthCheckPath: /api/health
+    disk:
+      name: tgstore-data
+      mountPath: /data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: DATA_DIR
+        value: /data
       - key: DEV_LOGIN
         value: false
+      - key: ADMIN_KEY
+        generateValue: true
       - key: BOT_TOKEN
         sync: false
       - key: BOT_USERNAME
@@ -22,7 +30,7 @@
       - key: STORAGE_CHANNEL_ID
         sync: false
       - key: JWT_SECRET
-        sync: false
+        generateValue: true
       - key: MT_API_ID
         sync: false
       - key: MT_API_HASH
