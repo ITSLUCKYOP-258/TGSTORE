@@ -59,91 +59,204 @@ export default function Login() {
   );
 
   return (
-    <div className="relative flex min-h-full flex-col bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-[#0e1621] dark:text-slate-100 lg:flex-row">
-      <div className="absolute top-4 right-4 z-20">
+    <div className="relative flex min-h-screen flex-col bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-[#0b111d] dark:text-slate-100 lg:flex-row">
+      {/* Top right floating theme switcher */}
+      <div className="absolute top-4 right-4 z-30">
         <ThemeToggle />
       </div>
 
-      {/* Left hero — shorter on mobile so the login card stays on screen */}
-      <div className="relative flex flex-1 flex-col justify-center overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 px-8 py-8 text-white sm:py-12 lg:px-16 lg:py-16">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-32 -left-16 h-96 w-96 rounded-full bg-sky-400/20 blur-2xl" />
-        <div className="relative mx-auto w-full max-w-xl">
-          <div className="mb-6 flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-2xl backdrop-blur">
-              ☁️
-            </div>
-            <span className="text-2xl font-bold tracking-tight">TGStore</span>
+      {/* Left hero: Product Showcase & Infinite Cloud Preview */}
+      <div className="relative flex flex-1 flex-col justify-between overflow-hidden bg-gradient-to-br from-indigo-900 via-[#101728] to-slate-950 px-6 py-10 text-white sm:px-12 sm:py-16 lg:px-16 lg:py-20">
+        {/* Glow backdrop circles */}
+        <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-sky-500/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 right-0 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl" />
+
+        {/* Top brand header */}
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-400 to-indigo-500 shadow-lg shadow-sky-500/30">
+            <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+            </svg>
           </div>
-          <h1 className="text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
-            Unlimited cloud storage, powered by Telegram.
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-bold tracking-tight">TGStore</span>
+              <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-300 ring-1 ring-sky-500/30">
+                UNLIMITED
+              </span>
+            </div>
+            <p className="text-xs text-slate-400">Personal Cloud on Telegram</p>
+          </div>
+        </div>
+
+        {/* Center showcase */}
+        <div className="relative z-10 my-8 max-w-xl lg:my-auto">
+          <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs font-medium text-sky-300 backdrop-blur-md">
+            <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />
+            Zero Subscription • No File Size Limits
+          </div>
+
+          <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl leading-tight">
+            Infinite Cloud Storage,{' '}
+            <span className="bg-gradient-to-r from-sky-400 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
+              Powered by Telegram
+            </span>
           </h1>
-          <p className="mt-4 text-base text-indigo-100 sm:mt-5 sm:text-lg">
-            Your files are chunked and stored safely on Telegram's infrastructure — no storage
-            caps, no metering. A clean drive interface on top: folders, previews, sharing and
-            search.
+
+          <p className="mt-4 text-sm leading-relaxed text-slate-300 sm:text-base">
+            Turn your Telegram account into an unlimited, high-speed private drive. Every file is automatically chunked, safely stored, and instantly streamable in your browser.
           </p>
-          {/* Feature chips — hidden on xs so they don't push the login card off screen */}
-          <ul className="mt-8 hidden gap-4 text-sm text-indigo-100 sm:grid sm:grid-cols-2">
+          {/* Interactive Drive UI Mockup */}
+          <div className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-2xl backdrop-blur-xl">
+            <div className="mb-3 flex items-center justify-between border-b border-white/5 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
+                <div className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
+                <div className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
+                <span className="ml-2 font-mono text-xs text-slate-400">tgstore://my-vault</span>
+              </div>
+              <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/20">
+                Live Sync
+              </span>
+            </div>
+
+            {/* Storage bar */}
+            <div className="mb-3 space-y-1.5 rounded-xl bg-white/[0.03] p-2.5">
+              <div className="flex justify-between text-xs font-medium text-slate-300">
+                <span className="flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 00-9.78 2.096A4.001 4.001 0 003 15z" />
+                  </svg>
+                  Telegram Cloud Storage
+                </span>
+                <span className="text-sky-300 font-mono">142.8 GB / ∞</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                <div className="h-full w-2/5 rounded-full bg-gradient-to-r from-sky-400 to-indigo-500" />
+              </div>
+            </div>
+
+            {/* Mock file cards */}
+            <div className="space-y-1.5 font-mono text-xs">
+              <div className="flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2 text-slate-200">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <span className="text-sm">🎬</span>
+                  <span className="truncate">Cinematic_4K_Project.mov</span>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0 text-[11px] text-slate-400">
+                  <span className="hidden sm:inline text-sky-400">Stream ready</span>
+                  <span>1.84 GB</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2 text-slate-200">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <span className="text-sm">🔐</span>
+                  <span className="truncate">Encrypted_Vault_Backup.zip</span>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0 text-[11px] text-slate-400">
+                  <span className="hidden sm:inline text-emerald-400">E2EE AES-256</span>
+                  <span>420 MB</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Feature highlights pill grid */}
+          <div className="mt-6 grid grid-cols-2 gap-2.5 text-xs sm:grid-cols-4">
             {[
-              ['♾️', 'Unlimited storage'],
-              ['⚡', 'Fast chunked uploads'],
-              ['🔒', 'Private by default'],
-              ['🔗', 'One-click share links'],
-              ['👁️', 'Instant media previews'],
-              ['🗑️', 'Trash & restore'],
-            ].map(([emoji, label]) => (
-              <li key={label} className="flex items-center gap-3 rounded-xl bg-white/10 px-4 py-3 backdrop-blur">
-                <span className="text-lg">{emoji}</span>
-                {label}
-              </li>
+              ['⚡ 2GB Limit', 'Per MTProto chunk'],
+              ['🔒 Vault E2EE', 'Zero knowledge key'],
+              ['🎬 In-Browser', 'Direct media stream'],
+              ['🔗 Share Link', 'Password-protected'],
+            ].map(([title, desc]) => (
+              <div key={title} className="rounded-xl border border-white/5 bg-white/[0.03] p-2.5 backdrop-blur">
+                <p className="font-semibold text-white">{title}</p>
+                <p className="mt-0.5 text-[10px] text-slate-400">{desc}</p>
+              </div>
             ))}
-          </ul>
+          </div>
+        </div>
+
+        {/* Footer info */}
+        <div className="relative z-10 flex items-center justify-between pt-6 text-xs text-slate-400 border-t border-white/5">
+          <span>TGStore Engine</span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            MTProto v2 Connected
+          </span>
         </div>
       </div>
 
-      {/* Right: login card */}
-      <div className="flex flex-1 items-center justify-center px-6 py-10 lg:py-16">
-        <div className="w-full max-w-sm">
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Sign in</h2>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            Use your Telegram account to access your drive.
-          </p>
+      {/* Right: Modern Login Card Column */}
+      <div className="relative flex flex-1 items-center justify-center p-6 sm:p-12 lg:p-16">
+        {/* Subtle radial ambient lighting */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="h-80 w-80 rounded-full bg-sky-500/10 blur-3xl dark:bg-sky-500/15" />
+        </div>
 
-          <div className="mt-8 flex flex-col gap-4">
+        <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white/95 p-8 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#121c2d]/95 sm:p-10">
+          {/* Card header */}
+          <div className="mb-6 flex flex-col items-center text-center">
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-400 via-sky-500 to-blue-600 shadow-lg shadow-sky-500/30">
+              <svg className="h-7 w-7 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Connect to TGStore
+            </h2>
+            <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+              Sign in with your Telegram account to access your storage
+            </p>
+          </div>
+
+          {/* Phone login form */}
+          <div className="space-y-5">
             <TelegramPhoneLogin onConnected={(u) => setUser(u)} />
 
             {telegramWidget}
-            {config?.telegramLoginEnabled === false && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
-                Telegram login isn't configured on this server. Set <code>BOT_TOKEN</code>,{' '}
-                <code>BOT_USERNAME</code> and <code>PUBLIC_BASE_URL</code> in{' '}
-                <code>server/.env</code> to enable the Telegram Login Widget — or use dev login
-                below for local development.
-              </div>
-            )}
 
             {config?.devLoginEnabled && (
-              <button
-                onClick={devLogin}
-                disabled={busy}
-                className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50 dark:border dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
-              >
-                {busy ? 'Signing in…' : 'Continue with Dev Login (local)'}
-              </button>
+              <>
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-200 dark:border-white/10" />
+                  </div>
+                  <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+                    <span className="bg-white px-2.5 font-medium text-slate-400 dark:bg-[#121c2d] dark:text-slate-500">
+                      Local Development
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={devLogin}
+                  disabled={busy}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
+                >
+                  <svg className="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>{busy ? 'Connecting…' : 'One-Click Dev Login'}</span>
+                </button>
+              </>
             )}
 
             {error && (
-              <p className="rounded-lg border border-transparent bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400">
-                {error}
-              </p>
+              <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-600 dark:text-red-400">
+                <span className="text-sm">⚠️</span>
+                <span>{error}</span>
+              </div>
             )}
           </div>
 
-          <p className="mt-8 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            By continuing you agree that files you upload are stored in the bot's private Telegram
-            storage channel associated with this deployment.
-          </p>
+          {/* Privacy & Security banner */}
+          <div className="mt-8 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3.5 text-center text-[11px] leading-relaxed text-slate-500 dark:border-white/5 dark:bg-white/[0.02] dark:text-slate-400">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">🔒 Official Telegram MTProto API</span>
+            <p className="mt-0.5">Your files are stored in your private Telegram storage channel. Credentials are never logged or stored on intermediate servers.</p>
+          </div>
         </div>
       </div>
     </div>
