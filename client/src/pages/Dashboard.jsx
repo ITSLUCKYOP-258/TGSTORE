@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, uploadFile } from '../api.js';
 import { useVault } from '../hooks/useVault';
@@ -84,10 +84,11 @@ export default function Dashboard() {
     setShowNewCategory(false);
   };
 
-  const handleCreateFolder = async () => {
+  const handleCreateFolder = async (chosenCat) => {
     if (!newFolderName.trim()) return;
     setFolderModal((m) => ({ ...m, submitting: true, error: null, success: null }));
-    const result = await handlers.handleCreateFolder(newFolderName);
+    const targetCatId = chosenCat?.id ?? categoryId ?? categories[0]?.id;
+    const result = await handlers.handleCreateFolder(newFolderName, targetCatId);
     if (result?.ok) {
       const f = result.folder;
       setFolderModal((m) => ({
@@ -107,13 +108,14 @@ export default function Dashboard() {
   const view = !categoryId ? 'saved' : !folderId ? 'category' : 'folder';
 
   return (
-    <div className="flex h-dvh bg-slate-50">
+    <div className="flex h-dvh bg-slate-50 text-slate-900 antialiased dark:bg-[#0e1621] dark:text-slate-100">
       <Sidebar
         user={user}
         categories={categories}
         categoryId={categoryId}
         navigate={navigate}
         onNewCategory={() => setShowNewCategory(true)}
+        onNewFolder={openNewFolder}
         onLogout={handlers.handleLogout}
         onDeleteCategory={handlers.handleDeleteCategory}
         mobileOpen={drawerOpen}
@@ -155,7 +157,19 @@ export default function Dashboard() {
         )}
       </main>
       {showNewCategory && <NewCategoryModal name={newCategoryName} setName={setNewCategoryName} onCreate={() => handleCreateCategory()} onClose={() => setShowNewCategory(false)} />}
-      {folderModal.open && <NewFolderModal name={newFolderName} setName={setNewFolderName} onCreate={handleCreateFolder} onClose={() => setFolderModal({ open: false, submitting: false, error: null, success: null })} error={folderModal.error} submitting={folderModal.submitting} success={folderModal.success} hasCategories={categories.length > 0} categoryName={currentCategory?.name} />}
+      {folderModal.open && (
+        <NewFolderModal
+          name={newFolderName}
+          setName={setNewFolderName}
+          onCreate={handleCreateFolder}
+          onClose={() => setFolderModal({ open: false, submitting: false, error: null, success: null })}
+          error={folderModal.error}
+          submitting={folderModal.submitting}
+          success={folderModal.success}
+          categories={categories}
+          categoryId={categoryId ?? categories[0]?.id}
+        />
+      )}
       {showSavedPicker && <SavedMessagesPicker onSelect={handlers.handleUploadFromSaved} onClose={() => setShowSavedPicker(false)} />}
       {previewItem && <MediaPreview item={previewItem} onClose={() => setPreviewItem(null)} />}
       <UploadProgress uploads={uploads} />

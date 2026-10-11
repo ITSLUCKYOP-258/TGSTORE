@@ -18,9 +18,9 @@ export function useDashboardHandlers({
     setTimeout(() => setToastRef.current(null), 3500);
   }, []);
   
-  const loadCategories = useCallback(async () => { try { const { categories } = await api.listCategories(); setCategories(categories); } catch (e) { showToast(e.message, true); } }, []);
+  const loadCategories = useCallback(async () => { try { const { categories } = await api.listCategories(); setCategories(categories || []); } catch (e) { showToast(e.message, true); } }, []);
   const loadSavedMessages = useCallback(async (filter = 'all') => { try { setLoading(true); const { media } = await api.savedMessages(filter); setSavedMedia(media || []); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, []);
-  const loadCategoryContents = useCallback(async () => { if (!categoryId) return; try { setLoading(true); const cats = await api.listCategories(); setCurrentCategory(cats.categories.find(c => c.id === categoryId)); const { folders, currentFolder } = await api.listFolders(categoryId, folderId || null); setFolders(folders || []); setCurrentFolder(currentFolder || null); const { files } = await api.listFiles(categoryId, folderId || null); setFiles(await withDecryptedMeta(files || [], vault.getKey())); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, [categoryId, folderId]);
+  const loadCategoryContents = useCallback(async () => { if (!categoryId) return; try { setLoading(true); const cats = await api.listCategories(); setCurrentCategory(cats?.categories?.find(c => String(c.id) === String(categoryId)) || null); const { folders, currentFolder } = await api.listFolders(categoryId, folderId || null); setFolders(folders || []); setCurrentFolder(currentFolder || null); const { files } = await api.listFiles(categoryId, folderId || null); setFiles(await withDecryptedMeta(files || [], vault.getKey())); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, [categoryId, folderId]);
 
   const handleCreateCategory = useCallback(async (name) => {
     if (!name?.trim()) { showToast('Category name is required', true); return; }
@@ -33,18 +33,26 @@ export function useDashboardHandlers({
       showToast(e.message, true);
     }
   }, [navigate]);
-  const handleCreateFolder = useCallback(async (name) => {
+  const handleCreateFolder = useCallback(async (name, targetCategoryId) => {
     const trimmed = name.trim();
     if (!trimmed) return { ok: false, error: 'Folder name is required' };
-    if (!categoryId) return { ok: false, error: 'Choose a category first — folders live in a category channel' };
+    // The drawer lets the user pick any category; fall back to the current one.
+    const cid = targetCategoryId ?? categoryId;
+    if (!cid) return { ok: false, error: 'Choose a category first — folders live in a category channel' };
     try {
-      const { folder } = await api.createFolder(trimmed, categoryId, folderId);
+      // Always create at the top level of the chosen category (no nested parent).
+      const { folder } = await api.createFolder(trimmed, cid, null);
       const details =
         folder.channelMessageId
           ? `marker message #${folder.channelMessageId} posted to your Telegram channel`
           : 'created (no category channel — marker not posted)';
       showToast(`Folder '${folder.name}' created — ${details}`);
-      loadCategoryContents();
+      // If we created it inside the currently-open category, refresh the view.
+      if (Number(cid) === Number(categoryId)) {
+        loadCategoryContents();
+      } else {
+        navigate(`/app/category/${cid}`);
+      }
       return { ok: true, folder };
     } catch (e) {
       showToast(e.message, true);

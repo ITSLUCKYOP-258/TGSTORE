@@ -66,94 +66,114 @@ export default function MediaGrid({ media, onPreview, onDownload, onDelete, show
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <div className="mb-3 text-5xl">📭</div>
-        <p className="text-sm text-slate-500">No media found</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">No media found</p>
       </div>
     );
   }
 
   return (
     <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-      {media.map((item, idx) => (
-        <div
-          key={item.id || idx}
-          className="group relative aspect-square cursor-pointer overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition hover:border-indigo-300 hover:shadow-md"
-          onClick={() => onPreview?.(item)}
-        >
-          {item.encrypted && item.id && gridKind(item) === 'image' ? (
-            /* E2EE image: decrypt-on-scroll thumbnail — Telegram never sees it */
-            <SecureThumb item={item} fallback={gridIcon(item)} />
-          ) : (
-            <>
-              {/* Icon fallback (always rendered underneath) */}
-              <div className="flex h-full w-full items-center justify-center text-4xl">
-                {gridIcon(item)}
+      {media.map((item, idx) => {
+        const hasThumb = Boolean(item.thumbnail || (item.encrypted && item.id && gridKind(item) === 'image'));
+
+        return (
+          <div
+            key={item.id || idx}
+            className={`group relative aspect-square cursor-pointer overflow-hidden rounded-xl border transition hover:border-indigo-400 hover:shadow-md dark:border-white/5 dark:bg-[#17212b] dark:hover:border-sky-400/50 ${
+              hasThumb ? 'border-slate-200 bg-slate-100' : 'border-slate-200 bg-white shadow-sm dark:shadow-none'
+            }`}
+            onClick={() => onPreview?.(item)}
+          >
+            {item.encrypted && item.id && gridKind(item) === 'image' ? (
+              /* E2EE image: decrypt-on-scroll thumbnail — Telegram never sees it */
+              <SecureThumb item={item} fallback={gridIcon(item)} />
+            ) : (
+              <>
+                {/* Icon fallback (always rendered underneath) */}
+                <div className={`flex h-full w-full items-center justify-center text-4xl ${!hasThumb ? 'pb-8' : ''}`}>
+                  {gridIcon(item)}
+                </div>
+
+                {/* Real thumbnail on top — removes itself on load error to reveal the icon */}
+                {item.thumbnail && (
+                  <img
+                    src={item.thumbnail}
+                    alt={item.name}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    onError={(e) => e.currentTarget.remove()}
+                  />
+                )}
+              </>
+            )}
+
+            {/* Label strip: photo gradient for thumbnails, clean solid panel for non-media */}
+            {hasThumb ? (
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2.5 pt-6">
+                <p className="truncate text-xs font-semibold text-white drop-shadow-sm">{item.name || 'Untitled'}</p>
+                {item.size && <p className="text-[10px] font-medium text-white/80 drop-shadow-sm">{formatBytes(item.size)}</p>}
               </div>
+            ) : (
+              <div className="absolute inset-x-0 bottom-0 border-t border-slate-100 bg-slate-50/95 px-2.5 py-1.5 backdrop-blur-sm dark:border-white/5 dark:bg-[#111922]/95">
+                <p className="truncate text-xs font-semibold text-slate-800 dark:text-slate-100">{item.name || 'Untitled'}</p>
+                {item.size && <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{formatBytes(item.size)}</p>}
+              </div>
+            )}
 
-              {/* Real thumbnail on top — removes itself on load error to reveal the icon */}
-              {item.thumbnail && (
-                <img
-                  src={item.thumbnail}
-                  alt={item.name}
-                  loading="lazy"
-                  className="absolute inset-0 h-full w-full object-cover"
-                  onError={(e) => e.currentTarget.remove()}
-                />
+            {/* Actions: download & delete */}
+            <div className="absolute right-2 top-2 flex gap-1 transition md:opacity-0 md:group-hover:opacity-100">
+              {onDownload && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDownload(item); }}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition ${
+                    hasThumb
+                      ? 'bg-black/50 text-white hover:bg-black/75 backdrop-blur-sm'
+                      : 'border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-100 hover:text-slate-900 dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20'
+                  }`}
+                  aria-label="Download"
+                >
+                  ⬇
+                </button>
               )}
-            </>
-          )}
-
-          {/* Overlay: always visible on mobile, hover-reveal on md+ */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent transition md:opacity-0 md:group-hover:opacity-100">
-            <div className="absolute bottom-0 left-0 right-0 p-2">
-              <p className="truncate text-xs text-white">{item.name || 'Untitled'}</p>
-              {item.size && <p className="text-[10px] text-white/70">{formatBytes(item.size)}</p>}
+              {onDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition ${
+                    hasThumb
+                      ? 'bg-black/50 text-red-400 hover:bg-black/75 backdrop-blur-sm'
+                      : 'border border-slate-200 bg-white text-red-600 shadow-sm hover:bg-red-50 dark:border-white/10 dark:bg-white/10 dark:text-red-400 dark:hover:bg-red-500/20'
+                  }`}
+                  aria-label="Delete"
+                >
+                  🗑
+                </button>
+              )}
             </div>
-          </div>
 
-          {/* Actions: always visible on mobile, hover-reveal on md+ */}
-          <div className="absolute right-2 top-2 flex gap-1 transition md:opacity-0 md:group-hover:opacity-100">
-            {onDownload && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onDownload(item); }}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-slate-700 hover:bg-white"
-                aria-label="Download"
-              >
-                ⬇
-              </button>
+            {/* Saved badge */}
+            {showSavedBadge && (
+              <div className="absolute left-2 top-2 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm dark:bg-[#3390ec]">
+                Saved
+              </div>
             )}
-            {onDelete && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-red-600 hover:bg-white"
-                aria-label="Delete"
-              >
-                🗑
-              </button>
-            )}
+
+            {/* File type badge */}
+            {(() => {
+              const k = gridKind(item);
+              const badgeClass = "absolute left-2 rounded px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm " + (hasThumb ? "bottom-2" : "bottom-10");
+              if (k === 'video') return <div className={`${badgeClass} bg-black/75`}>▶ {item.duration || 'video'}</div>;
+              if (k === 'audio') return <div className={`${badgeClass} bg-black/75`}>▶ audio</div>;
+              if (k === 'pdf') return <div className={`${badgeClass} bg-red-600`}>PDF</div>;
+              if (k === 'code') return <div className={`${badgeClass} bg-indigo-600 font-mono`}>{gridExt(item.name).toUpperCase()}</div>;
+              if (k === 'text') return <div className={`${badgeClass} bg-slate-700`}>TXT</div>;
+              if (k === 'archive') return <div className={`${badgeClass} bg-amber-600`}>ZIP</div>;
+              if (k === 'doc') return <div className={`${badgeClass} bg-blue-600`}>DOC</div>;
+              if (k === 'sheet') return <div className={`${badgeClass} bg-green-600`}>XLS</div>;
+              return null;
+            })()}
           </div>
-
-          {/* Saved badge */}
-          {showSavedBadge && (
-            <div className="absolute left-2 top-2 rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-medium text-white">
-              Saved
-            </div>
-          )}
-
-          {/* File type badge */}
-          {(() => {
-            const k = gridKind(item);
-            if (k === 'video') return <div className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">▶ {item.duration || 'video'}</div>;
-            if (k === 'audio') return <div className="absolute bottom-2 left-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">▶ audio</div>;
-            if (k === 'pdf') return <div className="absolute bottom-2 left-2 rounded bg-red-600/80 px-1.5 py-0.5 text-[10px] font-bold text-white">PDF</div>;
-            if (k === 'code') return <div className="absolute bottom-2 left-2 rounded bg-indigo-600/80 px-1.5 py-0.5 text-[10px] font-mono text-white">{gridExt(item.name).toUpperCase()}</div>;
-            if (k === 'text') return <div className="absolute bottom-2 left-2 rounded bg-slate-600/80 px-1.5 py-0.5 text-[10px] text-white">TXT</div>;
-            if (k === 'archive') return <div className="absolute bottom-2 left-2 rounded bg-amber-600/80 px-1.5 py-0.5 text-[10px] text-white">ZIP</div>;
-            if (k === 'doc') return <div className="absolute bottom-2 left-2 rounded bg-blue-600/80 px-1.5 py-0.5 text-[10px] text-white">DOC</div>;
-            if (k === 'sheet') return <div className="absolute bottom-2 left-2 rounded bg-green-600/80 px-1.5 py-0.5 text-[10px] text-white">XLS</div>;
-            return null;
-          })()}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
