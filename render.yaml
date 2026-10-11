@@ -8,17 +8,20 @@ services:
     buildCommand: npm ci && cd ../client && npm ci && npm run build && cd ../server
     startCommand: node src/index.js
     healthCheckPath: /api/health
-    disk:
-      name: tgstore-data
-      mountPath: /data
-      sizeGB: 1
+    # Note: Render Free plan does not support persistent disks.
+    # To enable persistent SQLite storage on Render, change plan: starter ($7/mo)
+    # and uncomment the disk configuration below:
+    # disk:
+    #   name: tgstore-data
+    #   mountPath: /data
+    #   sizeGB: 1
     envVars:
+      - key: NODE_VERSION
+        value: 22.14.0
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
-      - key: DATA_DIR
-        value: /data
       - key: DEV_LOGIN
         value: false
       - key: ADMIN_KEY

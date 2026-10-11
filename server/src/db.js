@@ -1,9 +1,13 @@
 ﻿import Database from './sqlite-compat.js';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DATA_DIR || path.join(__dirname, '..');
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
 const db = new Database(path.join(dataDir, 'tgstore.db'));
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
