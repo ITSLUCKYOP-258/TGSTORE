@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import { api, uploadFile, clearToken } from '../api.js';
 import { useVault } from './useVault';
-import { withDecryptedMeta } from '../lib/vault.js';
+import { withDecryptedMeta, encryptFile, encryptMetadata } from '../lib/vault.js';
 
 export function useDashboardHandlers({
   categoryId, folderId, navigate, setUser, setCategories, setCurrentCategory, setCurrentFolder, setFolders, setFiles, setSavedMedia, setLoading, setToast, setUploads, setShowSavedPicker
@@ -19,7 +19,7 @@ export function useDashboardHandlers({
   
   const loadCategories = useCallback(async () => { try { const { categories } = await api.listCategories(); setCategories(categories || []); } catch (e) { showToast(e.message, true); } }, []);
   const loadSavedMessages = useCallback(async (filter = 'all') => { try { setLoading(true); const { media } = await api.savedMessages(filter); setSavedMedia(media || []); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, []);
-  const loadCategoryContents = useCallback(async () => { if (!categoryId) return; try { setLoading(true); const cats = await api.listCategories(); setCurrentCategory(cats?.categories?.find(c => String(c.id) === String(categoryId)) || null); const { folders, currentFolder } = await api.listFolders(categoryId, folderId || null); setFolders(folders || []); setCurrentFolder(currentFolder || null); const { files } = await api.listFiles(categoryId, folderId || null); setFiles(await withDecryptedMeta(files || [], vault.getKey())); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, [categoryId, folderId]);
+  const loadCategoryContents = useCallback(async () => { if (!categoryId) return; try { setLoading(true); const cats = await api.listCategories(); setCurrentCategory(cats?.categories?.find(c => String(c.id) === String(categoryId)) || null); const { folders, currentFolder } = await api.listFolders(categoryId, folderId || null); setFolders(folders || []); setCurrentFolder(currentFolder || null); const { files } = await api.listFiles(categoryId, folderId || null); setFiles(await withDecryptedMeta(files || [], vault.getKey())); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, [categoryId, folderId, vault.status]);
 
   const handleCreateCategory = useCallback(async (name) => {
     if (!name?.trim()) { showToast('Category name is required', true); return; }
@@ -62,7 +62,6 @@ export function useDashboardHandlers({
     const files = Array.from(fileList || []);
     if (!files.length) return;
 
-    // Do NOT encrypt files while storing in Telegram: send original unencrypted files!
     const items = files.map((file) => ({
       id: `${Date.now()}-${Math.random()}`,
       file,
@@ -81,13 +80,26 @@ export function useDashboardHandlers({
       while (nextIdx < items.length) {
         const item = items[nextIdx++];
         try {
+          const key = vault.getKey();
+          let uploadPayload = item.file;
+          let metaArmor = null;
+
+          if (key) {
+            const { encrypted } = await encryptFile(item.file, key);
+            metaArmor = await encryptMetadata(
+              { name: item.file.name, mime: item.file.type || 'application/octet-stream', size: item.file.size },
+              key
+            );
+            uploadPayload = encrypted;
+          }
+
           await uploadFile(
-            item.file,
+            uploadPayload,
             folderId,
             (p) => setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, progress: p } : x))),
             undefined,
             categoryId,
-            null // Plain original file upload (no encryption before storing in TG)
+            metaArmor
           );
           setUploads((u) => u.filter((x) => x.id !== item.id));
           showToast(`Uploaded ${item.name}`);
@@ -103,7 +115,8 @@ export function useDashboardHandlers({
     }
     await Promise.all(workers);
     loadCategoryContents();
-  }, [categoryId, folderId, loadCategoryContents, setUploads, showToast]);
+  }, [categoryId, folderId, loadCategoryContents, setUploads, showToast, vault]);
+
 
   const handleUploadFromSaved = useCallback(async (selectedMedia) => {
     if (!categoryId) return;

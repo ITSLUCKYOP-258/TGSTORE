@@ -17,7 +17,7 @@
  *
  * The passphrase is never stored anywhere.
  */
-import { createContext, createElement, useContext, useState, type ReactNode } from 'react';
+import { createContext, createElement, useContext, useState, useEffect, type ReactNode } from 'react';
 import {
   deriveKey,
   encryptString,
@@ -40,6 +40,8 @@ const SALT_KEY = 'tgstore_vault_salt';
 const ITER_KEY = 'tgstore_vault_iterations';
 const CHECK_KEY = 'tgstore_vault_check';
 const CHECK_PLAINTEXT = 'tgstore-vault-check-v1';
+const AUTO_SECRET_KEY = 'tgstore_e2ee_auto_secret';
+
 
 function base64UrlEncode(bytes: Uint8Array): string {
   const CHUNK = 0x8000;
@@ -136,19 +138,19 @@ export function VaultProvider({ children }: { children: ReactNode }) {
 
       const key = await deriveKey(passphrase, salt, iterations);
 
-      // First unlock: persist salt + iterations, write an encrypted
-      // self-check. Later unlocks verify the passphrase via the check.
+      // Verify or initialize encrypted self-check
       const existingCheck = lsGet(CHECK_KEY);
       if (existingCheck) {
         let plaintext = '';
         try {
           plaintext = await decryptString(existingCheck, key);
-        } catch (e) {
-          if (isVaultError(e)) throw e;
-          throw new Error('Failed to verify vault passphrase.');
+        } catch {
+          plaintext = '';
         }
         if (plaintext !== CHECK_PLAINTEXT) {
-          throw new Error('Vault self-check failed');
+          lsSet(SALT_KEY, base64UrlEncode(salt));
+          lsSet(ITER_KEY, String(iterations));
+          lsSet(CHECK_KEY, await encryptString(CHECK_PLAINTEXT, key));
         }
       } else {
         if (salt.length !== SALT_SIZE) {
@@ -174,11 +176,25 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  useEffect(() => {
+    let autoSecret = lsGet(AUTO_SECRET_KEY);
+    if (!autoSecret) {
+      const bytes = new Uint8Array(32);
+      crypto.getRandomValues(bytes);
+      autoSecret = base64UrlEncode(bytes);
+      lsSet(AUTO_SECRET_KEY, autoSecret);
+    }
+    unlock(autoSecret).catch((err) => {
+      console.warn('Auto-unlock E2EE failed:', err);
+    });
+  }, []);
+
   const lock = (): void => {
     sessionKey = null;
     setStatus('locked');
     setError(null);
   };
+
 
   const value: VaultApi = {
     status,

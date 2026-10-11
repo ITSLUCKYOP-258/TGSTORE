@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, uploadFile } from '../api.js';
 import { useAuth } from '../App.jsx';
+import { useVault } from '../hooks/useVault';
+import { withDecryptedMeta, encryptFile, encryptMetadata } from '../lib/vault.js';
+
 import Sidebar from '../components/Sidebar.jsx';
 import ItemList, { ContextMenu } from '../components/ItemList.jsx';
 import {
@@ -14,6 +17,7 @@ import {
 
 export default function Categories() {
   const { user } = useAuth();
+  const vault = useVault();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -56,12 +60,13 @@ export default function Categories() {
     setLoading(true);
     api
       .get(`/api/drive?categoryId=${categoryId}${folderId != null ? `&folder=${folderId}` : ''}`)
-      .then((d) => {
-        setData({ folders: d.folders || [], files: d.files || [], breadcrumbs: d.breadcrumbs || [] });
+      .then(async (d) => {
+        const decryptedFiles = await withDecryptedMeta(d.files || [], vault.getKey());
+        setData({ folders: d.folders || [], files: decryptedFiles, breadcrumbs: d.breadcrumbs || [] });
       })
       .catch((e) => showToast(e.message, true))
       .finally(() => setLoading(false));
-  }, [categoryId, folderId]);
+  }, [categoryId, folderId, vault.status]);
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
   useEffect(() => { loadCategoryContents(); }, [loadCategoryContents]);
@@ -90,12 +95,26 @@ export default function Categories() {
       while (nextIdx < items.length) {
         const item = items[nextIdx++];
         try {
+          const key = vault.getKey();
+          let uploadPayload = item.file;
+          let metaArmor = null;
+
+          if (key) {
+            const { encrypted } = await encryptFile(item.file, key);
+            metaArmor = await encryptMetadata(
+              { name: item.file.name, mime: item.file.type || 'application/octet-stream', size: item.file.size },
+              key
+            );
+            uploadPayload = encrypted;
+          }
+
           await uploadFile(
-            item.file,
+            uploadPayload,
             folderId,
             (p) => setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, progress: p } : x))),
             undefined,
-            categoryId
+            categoryId,
+            metaArmor
           );
           setUploads((u) => u.filter((x) => x.id !== item.id));
           showToast(`Uploaded ${item.name}`);

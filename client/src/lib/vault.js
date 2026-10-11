@@ -66,3 +66,4 @@ export async function downloadDecrypted(file, key) {
 }
 
 export { isVaultError };
+export { encryptFile, encryptMetadata } from './crypto';

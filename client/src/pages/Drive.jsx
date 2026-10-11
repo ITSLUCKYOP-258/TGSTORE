@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { api, uploadFile } from '../api.js';
 import { useAuth } from '../App.jsx';
+import { useVault } from '../hooks/useVault';
+import { withDecryptedMeta, encryptFile, encryptMetadata } from '../lib/vault.js';
 import Sidebar from '../components/Sidebar.jsx';
+
 import ItemList, { ContextMenu } from '../components/ItemList.jsx';
 import {
   NewFolderModal,
@@ -49,6 +52,7 @@ export default function Drive() {
   const [uploads, setUploads] = useState([]); // {id, name, progress, error}
   const [dragOver, setDragOver] = useState(false);
   const fileInput = useRef(null);
+  const vault = useVault();
 
   const refreshStats = useCallback(() => {
     api.get('/api/storage').then(setStats).catch(() => {});
@@ -62,11 +66,14 @@ export default function Drive() {
     }${view === 'drive' ? `&folder=${folderId ?? ''}` : ''}`;
     api
       .get(url)
-      .then(setData)
+      .then(async (res) => {
+        const decryptedFiles = await withDecryptedMeta(res?.files || [], vault.getKey());
+        setData({ ...(res || {}), files: decryptedFiles });
+      })
       .catch((e) => setToast({ msg: e.message, isError: true }))
       .finally(() => setLoading(false));
     refreshStats();
-  }, [view, folderId, q, refreshStats]);
+  }, [view, folderId, q, refreshStats, vault.status]);
 
   useEffect(load, [load]);
   useEffect(() => localStorage.setItem('tgstore-layout', layout), [layout]);
@@ -95,8 +102,26 @@ export default function Drive() {
       while (nextIdx < items.length) {
         const item = items[nextIdx++];
         try {
-          await uploadFile(item.file, folderId, (p) =>
-            setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, progress: p } : x)))
+          const key = vault.getKey();
+          let uploadPayload = item.file;
+          let metaArmor = null;
+
+          if (key) {
+            const { encrypted } = await encryptFile(item.file, key);
+            metaArmor = await encryptMetadata(
+              { name: item.file.name, mime: item.file.type || 'application/octet-stream', size: item.file.size },
+              key
+            );
+            uploadPayload = encrypted;
+          }
+
+          await uploadFile(
+            uploadPayload,
+            folderId,
+            (p) => setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, progress: p } : x))),
+            undefined,
+            undefined,
+            metaArmor
           );
           setUploads((u) => u.filter((x) => x.id !== item.id));
           showToast(`Uploaded "${item.name}"`);
