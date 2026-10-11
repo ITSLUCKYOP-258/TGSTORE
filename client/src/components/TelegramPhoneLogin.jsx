@@ -34,7 +34,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
 
   if (enabled === false) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-500">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-relaxed text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
         Phone login is disabled. Ask the server owner to set <b>MT_API_ID</b> &amp;{' '}
         <b>MT_API_HASH</b> environment variables on the server (from{' '}
         <b>my.telegram.org → API development tools</b>) — after that, logging in is just phone
@@ -45,10 +45,10 @@ export default function TelegramPhoneLogin({ onConnected }) {
   if (enabled === null) return null;
 
   return (
-    <div className="rounded-2xl border border-slate-200 p-5">
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
       <div className="mb-3 flex items-center gap-2">
         <span className="text-xl">✈️</span>
-        <h3 className="font-bold text-slate-800">Log in with your Telegram account</h3>
+        <h3 className="font-bold text-slate-800 dark:text-white">Log in with your Telegram account</h3>
       </div>
 
       {step === 'phone' && (
@@ -63,7 +63,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
             });
           }}
         >
-          <label className="mb-1 block text-xs font-medium text-slate-500">
+          <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
             Phone number (international format)
           </label>
           <input
@@ -72,7 +72,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+911234567890"
-            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/20"
           />
           <button
             disabled={busy}
@@ -98,7 +98,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
             });
           }}
         >
-          <p className="mb-2 text-xs text-slate-500">
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
             We sent you a 5-digit code {viaApp ? 'in your Telegram app' : 'via Telegram'}. Enter it below.
           </p>
           <input
@@ -107,7 +107,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="12345"
-            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-center text-lg tracking-[0.4em] outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-center text-lg tracking-[0.4em] text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/20"
           />
           <button
             disabled={busy}
@@ -129,7 +129,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
             });
           }}
         >
-          <p className="mb-2 text-xs text-slate-500">
+          <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
             Your account has two-step verification. Enter your Telegram cloud password.
           </p>
           <input
@@ -138,7 +138,7 @@ export default function TelegramPhoneLogin({ onConnected }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Cloud password"
-            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-base outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-500/20"
           />
           <button
             disabled={busy}
@@ -156,13 +156,17 @@ export default function TelegramPhoneLogin({ onConnected }) {
             setCode('');
             setPassword('');
           }}
-          className="mt-3 text-xs text-slate-400 hover:text-slate-600"
+          className="mt-3 text-xs text-slate-400 transition hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-200"
         >
           ← Use a different number
         </button>
       )}
 
-      {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-3 rounded-lg border border-transparent bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

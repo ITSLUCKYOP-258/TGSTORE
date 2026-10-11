@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, saveToken } from '../api.js';
 import { useAuth } from '../App.jsx';
 import TelegramPhoneLogin from '../components/TelegramPhoneLogin.jsx';
+import ThemeToggle from '../components/ThemeToggle.jsx';
 
 export default function Login() {
   const { setUser } = useAuth();
@@ -58,7 +59,11 @@ export default function Login() {
   );
 
   return (
-    <div className="flex min-h-full flex-col lg:flex-row">
+    <div className="relative flex min-h-full flex-col bg-slate-50 text-slate-900 transition-colors duration-200 dark:bg-[#0e1621] dark:text-slate-100 lg:flex-row">
+      <div className="absolute top-4 right-4 z-20">
+        <ThemeToggle />
+      </div>
+
       {/* Left hero — shorter on mobile so the login card stays on screen */}
       <div className="relative flex flex-1 flex-col justify-center overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 px-8 py-8 text-white sm:py-12 lg:px-16 lg:py-16">
         <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-2xl" />
@@ -100,8 +105,8 @@ export default function Login() {
       {/* Right: login card */}
       <div className="flex flex-1 items-center justify-center px-6 py-10 lg:py-16">
         <div className="w-full max-w-sm">
-          <h2 className="text-2xl font-bold text-slate-900">Sign in</h2>
-          <p className="mt-2 text-sm text-slate-500">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Sign in</h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             Use your Telegram account to access your drive.
           </p>
 
@@ -110,7 +115,7 @@ export default function Login() {
 
             {telegramWidget}
             {config?.telegramLoginEnabled === false && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-relaxed text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300">
                 Telegram login isn't configured on this server. Set <code>BOT_TOKEN</code>,{' '}
                 <code>BOT_USERNAME</code> and <code>PUBLIC_BASE_URL</code> in{' '}
                 <code>server/.env</code> to enable the Telegram Login Widget — or use dev login
@@ -122,18 +127,20 @@ export default function Login() {
               <button
                 onClick={devLogin}
                 disabled={busy}
-                className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
+                className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50 dark:border dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
               >
                 {busy ? 'Signing in…' : 'Continue with Dev Login (local)'}
               </button>
             )}
 
             {error && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+              <p className="rounded-lg border border-transparent bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-400">
+                {error}
+              </p>
             )}
           </div>
 
-          <p className="mt-8 text-xs leading-relaxed text-slate-400">
+          <p className="mt-8 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             By continuing you agree that files you upload are stored in the bot's private Telegram
             storage channel associated with this deployment.
           </p>

@@ -154,7 +154,7 @@ export default function TelegramBrowser() {
     return (
       <div className="flex flex-1 items-start justify-center pt-10">
         <div className="w-full max-w-md">
-          <div className="mb-4 rounded-2xl bg-sky-50 p-4 text-sm text-sky-800">
+          <div className="mb-4 rounded-2xl border border-transparent bg-sky-50 p-4 text-sm text-sky-800 dark:border-sky-800/40 dark:bg-sky-950/40 dark:text-sky-300">
             Connect your Telegram account to browse all the chats, channels and files that are in
             your Telegram — right here.
           </div>

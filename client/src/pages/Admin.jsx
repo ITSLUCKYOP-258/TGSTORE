@@ -60,17 +60,17 @@ export default function Admin() {
   /* ── login screen ── */
   if (!authed) {
     return (
-      <div className="flex h-full items-center justify-center bg-slate-100">
+      <div className="flex h-full items-center justify-center bg-slate-100 dark:bg-[#0e1621] px-4">
         <form
           onSubmit={(e) => {
             e.preventDefault();
             if (!loading && input) load(input.trim());
           }}
-          className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl"
+          className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-900"
         >
           <div className="mb-1 text-center text-5xl">🛡️</div>
-          <h1 className="text-center text-xl font-bold text-slate-800">Admin access</h1>
-          <p className="mt-2 text-center text-sm text-slate-500">
+          <h1 className="text-center text-xl font-bold text-slate-800 dark:text-white">Admin access</h1>
+          <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">
             Enter the server admin key to view users and storage usage.
           </p>
           <input
@@ -79,13 +79,13 @@ export default function Admin() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Admin key"
-            className="mt-4 w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+            className="mt-4 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:placeholder:text-slate-500"
           />
-          {error && <p className="mt-2 text-sm font-medium text-red-600">{error}</p>}
+          {error && <p className="mt-2 text-sm font-medium text-red-600 dark:text-red-400">{error}</p>}
           <button
             type="submit"
             disabled={loading || !input}
-            className="mt-4 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50"
+            className="mt-4 w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50 dark:bg-indigo-600 dark:hover:bg-indigo-500"
           >
             {loading ? 'Checking…' : 'Sign in'}
           </button>
