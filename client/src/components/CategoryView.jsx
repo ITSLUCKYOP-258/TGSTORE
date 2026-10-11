@@ -63,7 +63,12 @@ export default function CategoryView({
                     multiple
                     accept="image/*,video/*,audio/*,application/*"
                     className="hidden"
-                    onChange={(e) => e.target.files?.length && onUploadFromComputer(e.target.files)}
+                    onChange={(e) => {
+                      if (e.target.files?.length) {
+                        onUploadFromComputer(e.target.files);
+                        e.target.value = '';
+                      }
+                    }}
                   />
                 </label>
                 <button
@@ -146,7 +151,12 @@ export default function CategoryView({
                     multiple
                     accept="image/*,video/*,audio/*,application/*"
                     className="hidden"
-                    onChange={(e) => e.target.files?.length && onUploadFromComputer(e.target.files)}
+                    onChange={(e) => {
+                      if (e.target.files?.length) {
+                        onUploadFromComputer(e.target.files);
+                        e.target.value = '';
+                      }
+                    }}
                   />
                 </label>
                 <button

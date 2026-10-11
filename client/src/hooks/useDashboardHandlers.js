@@ -1,7 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { api, uploadFile, clearToken } from '../api.js';
 import { useVault } from './useVault';
-import { encryptFile, encryptMetadata } from '../lib/crypto';
 import { withDecryptedMeta } from '../lib/vault.js';
 
 export function useDashboardHandlers({
@@ -60,33 +59,87 @@ export function useDashboardHandlers({
     }
   }, [categoryId, folderId, loadCategoryContents]);
   const handleUploadFromComputer = useCallback(async (fileList) => {
-    const key = vault.getKey();
-    for (const file of Array.from(fileList)) {
-      const id = `${Date.now()}-${Math.random()}`;
-      setUploads(u => [...u, { id, name: file.name, progress: 0 }]);
-      try {
-        let blob = file;
-        let nameArmor = null;
-        if (key) {
-          // E2EE: encrypt the bytes now — Telegram/server only ever see
-          // ciphertext; the real name/mime/size ride inside armored meta.
-          const { encrypted } = await encryptFile(file, key);
-          blob = encrypted;
-          nameArmor = await encryptMetadata(
-            { name: file.name, mime: file.type || 'application/octet-stream', size: file.size },
-            key
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    // Do NOT encrypt files while storing in Telegram: send original unencrypted files!
+    const items = files.map((file) => ({
+      id: `${Date.now()}-${Math.random()}`,
+      file,
+      name: file.name,
+      progress: 0,
+    }));
+
+    // Queue all uploads into the UI drawer immediately
+    setUploads((prev) => [...prev, ...items.map(({ id, name, progress }) => ({ id, name, progress }))]);
+
+    // Concurrency pool: 3 uploads simultaneously
+    const CONCURRENCY = 3;
+    let nextIdx = 0;
+
+    const worker = async () => {
+      while (nextIdx < items.length) {
+        const item = items[nextIdx++];
+        try {
+          await uploadFile(
+            item.file,
+            folderId,
+            (p) => setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, progress: p } : x))),
+            undefined,
+            categoryId,
+            null // Plain original file upload (no encryption before storing in TG)
           );
+          setUploads((u) => u.filter((x) => x.id !== item.id));
+          showToast(`Uploaded ${item.name}`);
+        } catch (e) {
+          setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, error: e.message } : x)));
         }
-        await uploadFile(blob, folderId, (p) => setUploads(u => u.map(x => x.id === id ? { ...x, progress: p } : x)), undefined, categoryId, nameArmor);
-        setUploads(u => u.filter(x => x.id !== id));
-        showToast(`Uploaded ${file.name}`);
-      } catch (e) {
-        setUploads(u => u.map(x => x.id === id ? { ...x, error: e.message } : x));
       }
+    };
+
+    const workers = [];
+    for (let i = 0; i < Math.min(CONCURRENCY, items.length); i++) {
+      workers.push(worker());
     }
+    await Promise.all(workers);
     loadCategoryContents();
-  }, [categoryId, folderId, loadCategoryContents]);
-  const handleUploadFromSaved = useCallback(async (selectedMedia) => { if (!categoryId) return; setShowSavedPicker(false); for (const media of selectedMedia) { try { await api.uploadFromSaved(media.id, categoryId, folderId, media.name || 'Saved Media', media.mime || 'application/octet-stream', media.size || 0); showToast(`Uploaded ${media.name || 'media'}`); } catch (e) { showToast(`Failed: ${e.message}`, true); } } loadCategoryContents(); }, [categoryId, folderId, loadCategoryContents]);
+  }, [categoryId, folderId, loadCategoryContents, setUploads, showToast]);
+
+  const handleUploadFromSaved = useCallback(async (selectedMedia) => {
+    if (!categoryId) return;
+    const mediaList = Array.from(selectedMedia || []);
+    if (!mediaList.length) return;
+    setShowSavedPicker(false);
+
+    const CONCURRENCY = 3;
+    let nextIdx = 0;
+
+    const worker = async () => {
+      while (nextIdx < mediaList.length) {
+        const media = mediaList[nextIdx++];
+        try {
+          await api.uploadFromSaved(
+            media.id,
+            categoryId,
+            folderId,
+            media.name || 'Saved Media',
+            media.mime || 'application/octet-stream',
+            media.size || 0
+          );
+          showToast(`Uploaded ${media.name || 'media'}`);
+        } catch (e) {
+          showToast(`Failed: ${e.message}`, true);
+        }
+      }
+    };
+
+    const workers = [];
+    for (let i = 0; i < Math.min(CONCURRENCY, mediaList.length); i++) {
+      workers.push(worker());
+    }
+    await Promise.all(workers);
+    loadCategoryContents();
+  }, [categoryId, folderId, loadCategoryContents, setShowSavedPicker, showToast]);
   const handleLogout = useCallback(async () => {
     try { await api.logout(); } catch { /* clear locally even if the call fails */ }
     // Clear persisted token for Capacitor native builds

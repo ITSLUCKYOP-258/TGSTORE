@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { rawUrl } from '../api.js';
 import { useVault } from '../hooks/useVault';
-import { decryptToObjectUrl } from '../lib/vault.js';
+import { decryptToObjectUrl, downloadDecrypted } from '../lib/vault.js';
 
 function previewExt(name) {
   return String(name || '').split('.').pop().toLowerCase();
@@ -148,29 +148,152 @@ function PdfViewer({ src }) {
   );
 }
 
+/** High-quality progressive image viewer: displays compressed preview immediately,
+ * streams full-quality original bytes in background, transitions seamlessly once loaded. */
+function ImagePreview({ item, fullSrc }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const [zoom, setZoom] = useState(false);
+  // Never load thumbSrc if file is encrypted (ciphertext is not an image)
+  const thumbSrc = !item?.encrypted ? (item.thumbnail || (item.id != null ? `/api/files/${item.id}/thumb` : null)) : null;
+
+  useEffect(() => {
+    setLoaded(false);
+    setError(false);
+  }, [fullSrc]);
+
+  return (
+    <div
+      className={`relative flex items-center justify-center bg-black overflow-auto select-none ${
+        zoom ? 'cursor-zoom-out' : 'cursor-zoom-in'
+      }`}
+      style={{ maxHeight: '72dvh', minHeight: '260px' }}
+      onClick={() => setZoom((z) => !z)}
+      title={zoom ? 'Click to fit screen' : 'Click for full original resolution'}
+    >
+      {/* Compressed thumbnail placeholder while full quality loads */}
+      {thumbSrc && !loaded && !error && (
+        <img
+          src={thumbSrc}
+          alt={item.name}
+          className="w-full object-contain transition-all duration-300 pointer-events-none"
+          style={{ maxHeight: '72dvh' }}
+        />
+      )}
+
+      {/* Loading badge */}
+      {!loaded && !error && (
+        <div className="absolute top-3 right-3 flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 text-xs text-white/90 backdrop-blur-md shadow-lg pointer-events-none">
+          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/20 border-t-sky-400" />
+          <span>{item?.encrypted ? 'Decrypting quality...' : 'Loading full quality...'}</span>
+        </div>
+      )}
+
+      {/* Full quality image */}
+      {fullSrc && (
+        <img
+          src={fullSrc}
+          alt={item.name}
+          onLoad={() => setLoaded(true)}
+          onError={() => setError(true)}
+          className={`transition-opacity duration-300 ${
+            zoom
+              ? 'max-h-none w-auto max-w-none'
+              : 'w-full object-contain'
+          } ${loaded ? 'opacity-100 relative' : thumbSrc ? 'opacity-0 absolute inset-0 m-auto' : 'opacity-100'}`}
+          style={zoom ? {} : { maxHeight: '72dvh' }}
+        />
+      )}
+
+      {/* Full quality loaded indicator */}
+      {loaded && (
+        <div className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-medium text-emerald-400 backdrop-blur-md pointer-events-none">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Full Quality</span>
+        </div>
+      )}
+
+      {/* Fallback if full quality fails */}
+      {error && (
+        <div className="p-8 text-center text-white/60">
+          <div className="text-3xl mb-2">⚠️</div>
+          <p className="text-sm">Could not load full quality image</p>
+          {thumbSrc && <p className="text-xs text-white/40 mt-1">Showing compressed preview</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MediaPreview({ item, onClose }) {
   const vault = useVault();
   // Decrypted object URL for E2EE files (null until resolved)
   const [decUrl, setDecUrl] = useState(null);
+  const [decrypting, setDecrypting] = useState(false);
+  const [decryptError, setDecryptError] = useState(null);
 
   useEffect(() => {
     setDecUrl(null);
-    if (!item?.encrypted || !item?.id) return undefined;
+    setDecryptError(null);
+    if (!item?.encrypted || !item?.id) {
+      setDecrypting(false);
+      return undefined;
+    }
     const key = vault.getKey();
-    if (!key) return undefined;
+    if (!key) {
+      setDecryptError('Vault is locked. Unlock vault to preview this encrypted file.');
+      setDecrypting(false);
+      return undefined;
+    }
     let active = true;
+    setDecrypting(true);
     decryptToObjectUrl(item, key)
       .then((h) => {
         if (!active) { h?.revoke?.(); return; }
-        setDecUrl(h);
+        if (!h) {
+          setDecryptError('Failed to decrypt file content.');
+        } else {
+          setDecUrl(h);
+        }
       })
-      .catch(() => { /* decrypt failed — fall back below */ });
-    return () => { active = false; };
+      .catch((err) => {
+        if (active) setDecryptError(err?.message || 'Decryption failed');
+      })
+      .finally(() => {
+        if (active) setDecrypting(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [item?.id, item?.encrypted]);
 
   if (!item) return null;
   const kind = previewKind(item);
-  const src = decUrl?.url || previewSrc(item);
+  // For encrypted files, ONLY use decrypted object URL
+  const src = item.encrypted ? decUrl?.url : (decUrl?.url || previewSrc(item));
+
+  const handleDownloadClick = async () => {
+    if (item.encrypted) {
+      if (decUrl?.url) {
+        const a = document.createElement('a');
+        a.href = decUrl.url;
+        a.download = item.name || 'download';
+        a.click();
+      } else {
+        const key = vault.getKey();
+        if (!key) {
+          alert('Vault is locked. Unlock vault to download this encrypted file.');
+          return;
+        }
+        await downloadDecrypted(item, key);
+      }
+    } else {
+      const a = document.createElement('a');
+      a.href = item.downloadUrl || `/api/files/${item.id}/download`;
+      a.download = item.name || 'download';
+      a.click();
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/85 sm:items-center" onClick={onClose}>
@@ -186,51 +309,72 @@ export default function MediaPreview({ item, onClose }) {
         >✕</button>
 
         <div className="rounded-2xl overflow-hidden bg-slate-900 shadow-2xl">
-          {kind === 'video' && (
-            <video key={src} controls preload="metadata" playsInline
-              className="w-full object-contain bg-black" style={{ maxHeight: '70dvh' }}>
-              <source src={src} type={resolveMime(item.name, item.mime)} />
-            </video>
-          )}
-          {kind === 'audio' && (
-            <div className="flex flex-col items-center justify-center px-8 py-12">
-              <div className="mb-4 text-6xl">🎵</div>
-              <p className="mb-5 px-4 text-center text-base font-medium text-white">{item.name}</p>
-              <audio key={src} controls preload="metadata" className="w-full max-w-md">
-                <source src={src} type={resolveMime(item.name, item.mime)} />
-              </audio>
+          {item.encrypted && decrypting ? (
+            <div className="flex flex-col items-center justify-center py-24 text-white">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-sky-400 mb-4" />
+              <p className="text-base font-semibold">Decrypting file…</p>
+              <p className="text-xs text-slate-400 mt-1">Decrypting with your vault key</p>
             </div>
-          )}
-          {kind === 'image' && (
-            <img src={item.url || item.thumbnail || src} alt={item.name}
-              className="w-full object-contain bg-black" style={{ maxHeight: '70dvh' }} />
-          )}
-          {kind === 'pdf' && <PdfViewer src={src} />}
-          {kind === 'text' && <TextViewer src={src} name={item.name} />}
-          {kind === 'other' && (
-            <div className="flex flex-col items-center justify-center py-16 text-white">
-              <div className="mb-4 text-7xl">{fileIcon(item)}</div>
-              <p className="text-lg font-medium">{item.name}</p>
-              {item.mime && <p className="mt-1 text-sm text-white/50">{item.mime}</p>}
-              {item.size && <p className="mt-1 text-xs text-white/40">{formatBytes(item.size)}</p>}
-              <p className="mt-4 text-sm text-white/40">No preview available — download to open</p>
+          ) : item.encrypted && decryptError ? (
+            <div className="flex flex-col items-center justify-center py-20 px-6 text-center text-white">
+              <div className="text-5xl mb-3">🔒</div>
+              <p className="text-lg font-semibold">{item.name}</p>
+              <p className="mt-2 text-sm text-red-400 max-w-md">{decryptError}</p>
+              <p className="mt-3 text-xs text-slate-400">Unlock your vault or check your passphrase to preview.</p>
             </div>
+          ) : (
+            <>
+              {kind === 'video' && src && (
+                <video key={src} controls preload="metadata" playsInline
+                  className="w-full object-contain bg-black" style={{ maxHeight: '70dvh' }}>
+                  <source src={src} type={resolveMime(item.name, item.mime)} />
+                </video>
+              )}
+              {kind === 'audio' && src && (
+                <div className="flex flex-col items-center justify-center px-8 py-12">
+                  <div className="mb-4 text-6xl">🎵</div>
+                  <p className="mb-5 px-4 text-center text-base font-medium text-white">{item.name}</p>
+                  <audio key={src} controls preload="metadata" className="w-full max-w-md">
+                    <source src={src} type={resolveMime(item.name, item.mime)} />
+                  </audio>
+                </div>
+              )}
+              {kind === 'image' && (
+                <ImagePreview item={item} fullSrc={src} />
+              )}
+              {kind === 'pdf' && src && <PdfViewer src={src} />}
+              {kind === 'text' && src && <TextViewer src={src} name={item.name} />}
+              {kind === 'other' && (
+                <div className="flex flex-col items-center justify-center py-16 text-white">
+                  <div className="mb-4 text-7xl">{fileIcon(item)}</div>
+                  <p className="text-lg font-medium">{item.name}</p>
+                  {item.mime && <p className="mt-1 text-sm text-white/50">{item.mime}</p>}
+                  {item.size && <p className="mt-1 text-xs text-white/40">{formatBytes(item.size)}</p>}
+                  <p className="mt-4 text-sm text-white/40">No preview available — download to open</p>
+                </div>
+              )}
+            </>
           )}
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1 pb-safe">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-white">{item.name}</p>
+            <p className="truncate text-sm font-medium text-white flex items-center gap-1.5">
+              <span>{item.name}</span>
+              {item.encrypted && <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">🔒 E2EE</span>}
+            </p>
             {item.size && <p className="text-xs text-white/60">{formatBytes(item.size)}</p>}
             {(kind === 'video' || kind === 'audio') && (
               <p className="mt-0.5 text-xs text-white/50">🔊 Use the player's volume slider</p>
             )}
           </div>
-          <a
-            href={(item.encrypted && decUrl?.url) || item.downloadUrl || `/api/files/${item.id}/download`}
-            download={item.name}
-            className="min-h-11 flex-shrink-0 rounded-lg bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20 transition"
-          >⬇ Download</a>
+          <button
+            type="button"
+            onClick={handleDownloadClick}
+            className="min-h-11 flex-shrink-0 rounded-lg bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20 transition cursor-pointer"
+          >
+            ⬇ Download
+          </button>
         </div>
       </div>
     </div>

@@ -5,6 +5,30 @@ import { ContextMenu } from './ItemList.jsx';
 /** File type icon tile. */
 function Thumb({ item }) {
   const ic = fileIcon(item);
+  const isImage = (item.mime || '').startsWith('image/') && !item.encrypted;
+  const thumbUrl = item.thumbnail || (item.id != null ? `/api/files/${item.id}/thumb` : null);
+
+  if (isImage && thumbUrl) {
+    return (
+      <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl ${ic.color}`}>
+        <img
+          src={thumbUrl}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover"
+          onError={(e) => {
+            if (item.id && !e.currentTarget.dataset.fallback) {
+              e.currentTarget.dataset.fallback = 'true';
+              e.currentTarget.src = `/api/files/${item.id}/raw`;
+            } else {
+              e.currentTarget.style.display = 'none';
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-lg ${ic.color}`}>
       {ic.icon}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, rawUrl } from '../api.js';
 import { formatBytes, fileKind } from '../lib/format.js';
 import { useVault } from '../hooks/useVault';
-import { decryptToObjectUrl } from '../lib/vault.js';
+import { decryptToObjectUrl, downloadDecrypted } from '../lib/vault.js';
 
 export function ModalShell({ title, onClose, children, wide }) {
   useEffect(() => {
@@ -244,29 +244,88 @@ export function ShareModal({ file, onClose }) {
   );
 }
 
+function ModalImagePreview({ file, src }) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const thumbSrc = file.thumbnail || (file.id != null ? `/api/files/${file.id}/thumb` : null);
+
+  return (
+    <div className="relative flex max-h-[65vh] min-h-64 w-full items-center justify-center overflow-hidden">
+      {thumbSrc && !loaded && !error && (
+        <img
+          src={thumbSrc}
+          alt={file.name}
+          className="max-h-[65vh] w-auto object-contain transition-all duration-300 pointer-events-none"
+        />
+      )}
+      {!loaded && !error && (
+        <div className="absolute top-3 right-3 flex items-center gap-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] text-white/80 backdrop-blur-sm pointer-events-none">
+          <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-sky-400" />
+          <span>Loading full quality...</span>
+        </div>
+      )}
+      <img
+        src={src}
+        alt={file.name}
+        onLoad={() => setLoaded(true)}
+        onError={() => setError(true)}
+        className={`max-h-[65vh] w-auto object-contain transition-opacity duration-300 ${
+          loaded ? 'opacity-100 relative' : thumbSrc ? 'opacity-0 absolute inset-0 m-auto' : 'opacity-100'
+        }`}
+      />
+      {loaded && (
+        <div className="absolute bottom-3 right-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-medium text-emerald-400 backdrop-blur-sm pointer-events-none">
+          ✓ Full Quality
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PreviewModal({ file, onClose }) {
   const kind = fileKind(file);
   const vault = useVault();
   const [decUrl, setDecUrl] = useState(null);
 
   // E2EE: resolve decrypted bytes for encrypted stored files
+  const [decrypting, setDecrypting] = useState(false);
+  const [decryptError, setDecryptError] = useState(null);
+
   useEffect(() => {
     setDecUrl(null);
-    if (!file?.encrypted || !file?.id) return undefined;
+    setDecryptError(null);
+    if (!file?.encrypted || !file?.id) {
+      setDecrypting(false);
+      return undefined;
+    }
     const key = vault.getKey();
-    if (!key) return undefined;
+    if (!key) {
+      setDecryptError('Vault is locked. Unlock vault to view encrypted file.');
+      setDecrypting(false);
+      return undefined;
+    }
     let active = true;
+    setDecrypting(true);
     decryptToObjectUrl(file, key)
-      .then((h) => { if (active) setDecUrl(h); else h?.revoke?.(); })
-      .catch(() => {});
+      .then((h) => {
+        if (!active) { h?.revoke?.(); return; }
+        if (!h) setDecryptError('Decryption failed.');
+        else setDecUrl(h);
+      })
+      .catch((err) => {
+        if (active) setDecryptError(err?.message || 'Decryption failed');
+      })
+      .finally(() => {
+        if (active) setDecrypting(false);
+      });
     return () => { active = false; };
   }, [file?.id, file?.encrypted]);
 
-  const src = decUrl?.url || rawUrl(file.id);
+  const src = file?.encrypted ? decUrl?.url : (decUrl?.url || rawUrl(file.id));
   const [text, setText] = useState(null);
 
   useEffect(() => {
-    if (kind === 'text' || kind === 'code') {
+    if (src && (kind === 'text' || kind === 'code')) {
       fetch(src, { credentials: 'include' })
         .then((r) => r.text())
         .then(setText)
@@ -274,37 +333,77 @@ export function PreviewModal({ file, onClose }) {
     }
   }, [src, kind]);
 
+  const handleDownload = async () => {
+    if (file.encrypted) {
+      if (decUrl?.url) {
+        const a = document.createElement('a');
+        a.href = decUrl.url;
+        a.download = file.name || 'download';
+        a.click();
+      } else {
+        const key = vault.getKey();
+        if (!key) {
+          alert('Vault is locked.');
+          return;
+        }
+        await downloadDecrypted(file, key);
+      }
+    } else {
+      const a = document.createElement('a');
+      a.href = `/api/files/${file.id}/download`;
+      a.download = file.name || 'download';
+      a.click();
+    }
+  };
+
   return (
     <ModalShell title={file.name} onClose={onClose} wide>
       <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
         <span>
           {file.mime} · {formatBytes(file.size)}
+          {file.encrypted && ' · 🔒 E2EE'}
         </span>
-        <a
-          href={(file.encrypted && decUrl?.url) || `/api/files/${file.id}/download`}
-          download={file.name}
-          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
+        <button
+          type="button"
+          onClick={handleDownload}
+          className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 cursor-pointer"
         >
           ⬇ Download
-        </a>
+        </button>
       </div>
       <div className="flex max-h-[65vh] min-h-64 items-center justify-center overflow-hidden rounded-xl bg-slate-950/95">
-        {kind === 'image' && (
-          <img src={src} alt={file.name} className="max-h-[65vh] w-auto object-contain" />
-        )}
-        {kind === 'video' && <video src={src} controls className="max-h-[65vh] w-full" />}
-        {kind === 'audio' && (
-          <div className="w-full p-10">
-            <div className="mb-6 text-center text-5xl">🎵</div>
-            <audio src={src} controls className="w-full" />
+        {file.encrypted && decrypting ? (
+          <div className="flex flex-col items-center justify-center p-12 text-white">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-sky-400 mb-3" />
+            <p className="text-sm font-medium">Decrypting file…</p>
           </div>
+        ) : file.encrypted && decryptError ? (
+          <div className="p-10 text-center text-white">
+            <div className="text-4xl mb-2">🔒</div>
+            <p className="text-sm text-red-400">{decryptError}</p>
+          </div>
+        ) : (
+          <>
+            {kind === 'image' && (
+              <ModalImagePreview file={file} src={src} />
+            )}
+            {kind === 'video' && src && <video src={src} controls className="max-h-[65vh] w-full" />}
+            {kind === 'audio' && src && (
+              <div className="w-full p-10">
+                <div className="mb-6 text-center text-5xl">🎵</div>
+                <audio src={src} controls className="w-full" />
+              </div>
+            )}
+            {kind === 'pdf' && src && (
+              <iframe src={src} title={file.name} className="h-[65vh] w-full rounded-xl bg-white" />
+            )}
+            {(kind === 'text' || kind === 'code') && src && (
+              <pre className="max-h-[65vh] w-full overflow-auto p-6 text-left text-xs leading-relaxed text-emerald-200">
+                {text ?? 'Loading…'}
+              </pre>
+            )}
+          </>
         )}
-        {kind === 'pdf' && (
-          <iframe src={src} title={file.name} className="h-[65vh] w-full rounded-xl bg-white" />
-        )}
-        {(kind === 'text' || kind === 'code') && (
-          <pre className="max-h-[65vh] w-full overflow-auto p-6 text-left text-xs leading-relaxed text-emerald-200">
-            {text ?? 'Loading…'}
           </pre>
         )}
         {!['image', 'video', 'audio', 'pdf', 'text', 'code'].includes(kind) && (

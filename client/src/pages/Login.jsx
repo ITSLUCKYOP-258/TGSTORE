@@ -81,19 +81,17 @@ export default function Login() {
 
         {/* Top brand header */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-400 to-indigo-500 shadow-lg shadow-sky-500/30">
-            <svg className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
-            </svg>
+          <div className="flex h-12 w-14 items-center justify-center rounded-2xl bg-white/10 p-1 shadow-lg shadow-sky-500/30 backdrop-blur-md">
+            <img src="/logo-icon.png" alt="TGStore" className="h-full w-auto object-contain drop-shadow" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xl font-bold tracking-tight">TGStore</span>
+              <span className="text-xl font-bold tracking-tight text-white">TG<span className="text-sky-400">Store</span></span>
               <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-semibold text-sky-300 ring-1 ring-sky-500/30">
                 UNLIMITED
               </span>
             </div>
-            <p className="text-xs text-slate-400">Personal Cloud on Telegram</p>
+            <p className="text-xs tracking-wider text-slate-300 uppercase font-medium">Your Files, On Telegram</p>
           </div>
         </div>
 
@@ -244,13 +242,11 @@ export default function Login() {
         <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white/95 p-8 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#121c2d]/95 sm:p-10">
           {/* Card header */}
           <div className="mb-6 flex flex-col items-center text-center">
-            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-sky-400 via-sky-500 to-blue-600 shadow-lg shadow-sky-500/30">
-              <svg className="h-7 w-7 text-white" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
-              </svg>
+            <div className="mb-3 flex h-16 w-20 items-center justify-center rounded-2xl bg-white p-1.5 shadow-lg shadow-sky-500/20 ring-1 ring-slate-200/80 dark:bg-slate-800/80 dark:ring-white/10">
+              <img src="/logo-icon.png" alt="TGStore" className="h-full w-auto object-contain drop-shadow-sm" />
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Connect to TGStore
+              Connect to TG<span className="text-sky-500 dark:text-sky-400">Store</span>
             </h2>
             <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
               Sign in with your Telegram account to access your storage

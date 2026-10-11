@@ -35,9 +35,18 @@ export default function Sidebar({
   const body = (
     <div className="flex h-full flex-col bg-white dark:bg-[#17212b]">
       <div className="flex items-center justify-between p-4 pb-2">
-        <div className="min-w-0 pr-2">
-          <h1 className="text-xl font-bold text-indigo-600 dark:text-sky-400">TGStore</h1>
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Telegram-powered storage</p>
+        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+          <img
+            src="/logo-icon.png"
+            alt="TGStore"
+            className="h-8 w-auto max-w-[44px] flex-shrink-0 object-contain drop-shadow-sm"
+          />
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold leading-tight tracking-tight text-slate-900 dark:text-white">
+              TG<span className="text-sky-500 dark:text-sky-400">Store</span>
+            </h1>
+            <p className="truncate text-[11px] text-slate-500 dark:text-slate-400">Telegram-powered storage</p>
+          </div>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <ThemeToggle />

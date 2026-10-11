@@ -16,17 +16,23 @@ export const isArmored = (s) => typeof s === 'string' && s.startsWith('TGS1:');
  * - Legacy/plaintext rows (or rows that fail auth) pass through unchanged.
  */
 export async function withDecryptedMeta(files, key) {
-  if (!key || !Array.isArray(files)) return files;
+  if (!Array.isArray(files)) return [];
   const out = [];
   for (const f of files) {
     if (isArmored(f?.name)) {
-      try {
-        const m = await decryptMetadata(f.name, key);
-        out.push({ ...f, name: m.name, mime: m.mime, size: m.size, encrypted: true });
-        continue;
-      } catch {
-        // Wrong key / corrupt entry — show the row as-is (armored name).
+      if (key) {
+        try {
+          const m = await decryptMetadata(f.name, key);
+          out.push({ ...f, name: m.name, mime: m.mime, size: m.size, encrypted: true });
+          continue;
+        } catch {
+          // Wrong key or corrupted metadata — flag as encrypted so raw ciphertext is never treated as plaintext
+          out.push({ ...f, name: 'Encrypted File', encrypted: true });
+          continue;
+        }
       }
+      out.push({ ...f, name: 'Encrypted File', encrypted: true });
+      continue;
     }
     out.push({ ...f, encrypted: false });
   }

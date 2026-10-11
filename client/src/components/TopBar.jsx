@@ -34,9 +34,10 @@ export default function TopBar({ title, user, onOpenMenu }) {
       </div>
 
       {/* Right: brand label keeps the bar balanced */}
-      <div className="flex min-w-[4.5rem] items-center justify-end gap-2">
-        <span className="hidden text-xs font-semibold text-slate-400 dark:text-slate-500 sm:inline">
-          TGStore
+      <div className="flex min-w-[4.5rem] items-center justify-end gap-1.5">
+        <img src="/logo-icon.png" alt="TGStore" className="hidden h-5 w-auto object-contain sm:inline" />
+        <span className="hidden text-xs font-semibold text-slate-700 dark:text-slate-200 sm:inline">
+          TG<span className="text-sky-500 dark:text-sky-400">Store</span>
         </span>
       </div>
     </header>

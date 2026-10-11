@@ -11,7 +11,15 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // Don't inject SW in dev — avoids stale-cache confusion while coding
       devOptions: { enabled: false },
-      includeAssets: ['icons/icon.svg', 'icons/favicon-32.png', 'icons/apple-touch-icon.png'],
+      includeAssets: [
+        'icons/icon.svg',
+        'icons/favicon-32.png',
+        'icons/apple-touch-icon.png',
+        'icons/icon-192.png',
+        'icons/icon-512.png',
+        'logo.png',
+        'logo-icon.png'
+      ],
       manifest: {
         name: 'TGStore — Unlimited Cloud Drive',
         short_name: 'TGStore',

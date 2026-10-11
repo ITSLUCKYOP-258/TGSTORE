@@ -21,11 +21,11 @@ export default function ShareView() {
   return (
     <div className="flex min-h-full items-center justify-center bg-slate-100 p-6">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
-        <div className="mb-6 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-lg text-white">
-            ☁️
-          </div>
-          <span className="font-bold tracking-tight text-slate-900">TGStore</span>
+        <div className="mb-6 flex items-center gap-2.5">
+          <img src="/logo-icon.png" alt="TGStore" className="h-9 w-auto object-contain" />
+          <span className="text-base font-bold tracking-tight text-slate-900">
+            TG<span className="text-sky-500">Store</span>
+          </span>
         </div>
 
         {error && (

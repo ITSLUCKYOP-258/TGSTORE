@@ -4,7 +4,7 @@
  *
  * Requires MT_API_ID / MT_API_HASH from https://my.telegram.org
  */
-import { TelegramClient, Api } from 'telegram';
+import { TelegramClient, Api, utils } from 'telegram';
 import { StringSession } from 'telegram/sessions/index.js';
 import { computeCheck } from 'telegram/Password.js';
 import { CustomFile } from 'telegram/client/uploads.js';
@@ -430,29 +430,41 @@ export async function getMessageThumb(userId, chatId, msgId, accessHash = null) 
 
   let buildLocation = null;
   let sizes = [];
+  let stripped = null;
+  const isUsableSize = (t) =>
+    Boolean(t?.type) &&
+    (t.className === 'PhotoSize' ||
+      t.className === 'PhotoSizeProgressive' ||
+      t.className === 'PhotoCachedSize');
+
   if (m.className === 'MessageMediaDocument' && m.document?.className === 'Document') {
     const doc = m.document;
+    stripped = (doc.thumbs || []).find((t) => t.className === 'PhotoStrippedSize' && t.bytes);
     buildLocation = (type) => new Api.InputDocumentFileLocation({
       id: doc.id,
       accessHash: doc.accessHash,
       fileReference: doc.fileReference || Buffer.alloc(0),
-      thumbSize: type, // required string in current layer
+      thumbSize: type,
     });
-    sizes = (doc.thumbs || []).filter((t) => t.className === 'PhotoSize' && t.size > 0 && t.type);
+    sizes = (doc.thumbs || []).filter(isUsableSize);
   } else if (m.className === 'MessageMediaPhoto' && m.photo?.className === 'Photo') {
     const photo = m.photo;
+    stripped = (photo.sizes || []).find((t) => t.className === 'PhotoStrippedSize' && t.bytes);
     buildLocation = (type) => new Api.InputPhotoFileLocation({
       id: photo.id,
       accessHash: photo.accessHash,
       fileReference: photo.fileReference || Buffer.alloc(0),
       thumbSize: type,
     });
-    sizes = (photo.sizes || []).filter((t) => t.className === 'PhotoSize' && t.size > 0 && t.type);
+    sizes = (photo.sizes || []).filter(isUsableSize);
   }
-  if (!buildLocation) return null;
+  if (!buildLocation && !stripped) return null;
 
-  // Prefer small sizes for thumbnails: s < m < x < t
-  sizes.sort((a, b) => a.size - b.size);
+  // Rank sizes to match Telegram Saved Messages preview quality:
+  // 'y' (1280/1080p) > 'x' (800p) > 'w' (2560p) > 'm' (320p) > small/stripped
+  const typeRank = { y: 6, x: 5, w: 4, m: 3, d: 2, c: 2, b: 2, a: 1, s: 1, t: 0 };
+  sizes.sort((a, b) => (typeRank[b.type] ?? 0) - (typeRank[a.type] ?? 0));
+
   for (const s of sizes) {
     try {
       const bufs = [];
@@ -467,6 +479,14 @@ export async function getMessageThumb(userId, chatId, msgId, accessHash = null) 
     } catch (err) {
       console.log(`[MT:thumb] user=${userId} msg=${msgId} size ${s.type} failed: ${err?.message || err}`);
     }
+  }
+
+  // Fallback to stripped only if no PhotoSize was downloadable
+  if (stripped) {
+    try {
+      const jpg = utils.strippedPhotoToJpg(stripped.bytes);
+      if (jpg && jpg.length > 0) return jpg;
+    } catch {}
   }
   return null;
 }
@@ -546,33 +566,61 @@ export async function sendFileToChannel(
     }));
   }
 
-  const opts = {
+  console.log(
+    `[MT:uploadFile] user=${userId} channel=${rawChannelId(channelId)} accessHash=${accessHash} ` +
+    `name="${filename}" size=${fileSize} replyTo=${replyToMessageId || 'none'}`
+  );
+
+  // Upload original bytes directly via client.uploadFile
+  const fileHandle = await client.uploadFile({
     file: input,
-    // forceDocument keeps the ORIGINAL bytes — Telegram would recompress
-    // photos/videos otherwise and break byte-exact downloads.
-    forceDocument: true,
-    fileSize: Number(fileSize || 0),
-    caption: caption || '',
-    attributes: attrs,
     workers: 1,
-    supportsStreaming: resolvedMime.startsWith('video/') || resolvedMime.startsWith('audio/'),
-  };
-  if (replyToMessageId && Number(replyToMessageId) > 0) {
-    opts.replyTo = Number(replyToMessageId); // reply to the folder marker message
+  });
+
+  // Explicitly set forceFile: true on InputMediaUploadedDocument so Telegram
+  // NEVER compresses or transcodes images/videos to photos. Original bytes stay intact.
+  const media = new Api.InputMediaUploadedDocument({
+    file: fileHandle,
+    mimeType: resolvedMime || 'application/octet-stream',
+    attributes: attrs,
+    forceFile: true,
+  });
+
+  const request = new Api.messages.SendMedia({
+    peer,
+    media,
+    message: caption || '',
+    replyTo:
+      replyToMessageId && Number(replyToMessageId) > 0
+        ? new Api.InputReplyToMessage({ replyToMsgId: Number(replyToMessageId) })
+        : undefined,
+  });
+
+  const result = await client.invoke(request);
+  const msg = client._getResponseMessage(request, result, peer);
+  const doc = msg?.document || msg?.media?.document;
+
+  let messageId = toNum(msg?.id) || 0;
+  let fileId = doc?.id ? String(doc.id) : null;
+
+  if (!messageId || !fileId) {
+    for (const u of result?.updates || []) {
+      if (u.className === 'UpdateMessageID') messageId = toNum(u.id) || messageId;
+      if (u.message && (u.className === 'UpdateNewChannelMessage' || u.className === 'UpdateNewMessage')) {
+        const m = u.message;
+        messageId = toNum(m.id) || messageId;
+        const d = m.media?.document || m.document;
+        if (d?.id) fileId = String(d.id);
+      }
+    }
   }
 
   console.log(
-    `[MT:uploadFile] user=${userId} channel=${rawChannelId(channelId)} accessHash=${accessHash} ` +
-    `name="${filename}" size=${opts.fileSize} replyTo=${opts.replyTo || 'none'}`
-  );
-  const msg = await client.sendFile(peer, opts);
-  const doc = msg?.document;
-  console.log(
-    `[MT:uploadFile] sent messageId=${toNum(msg?.id) || 'n/a'} mediaId=${doc?.id ? String(doc.id) : 'n/a'}`
+    `[MT:uploadFile] sent messageId=${messageId || 'n/a'} mediaId=${fileId || 'n/a'}`
   );
   return {
-    messageId: toNum(msg?.id) || 0,
-    fileId: doc?.id ? String(doc.id) : null,
+    messageId,
+    fileId,
   };
 }
 

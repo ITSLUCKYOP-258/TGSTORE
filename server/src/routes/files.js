@@ -268,6 +268,12 @@ router.get('/:id/thumb', requireAuth, async (req, res) => {
   const isMedia = /^image\//.test(file.mime || '') || /^video\//.test(file.mime || '');
   if (!isMedia) return res.status(404).json({ error: 'No thumbnail available' });
 
+  // For small-to-medium images (under 2.5 MB), redirect straight to /raw for
+  // exact original full-resolution sharpness — zero blur, fast download.
+  if (/^image\//.test(file.mime || '') && file.size > 0 && file.size <= 2.5 * 1024 * 1024) {
+    return res.redirect(302, `/api/files/${file.id}/raw`);
+  }
+
   const chunks = db.getChunks(file.id);
   const c = chunks?.[0];
   const isMT = /^\d+$/.test(String(c?.tg_file_id || ''));

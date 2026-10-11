@@ -78,21 +78,37 @@ export default function Drive() {
 
   /* ---------------- actions ---------------- */
   const startUpload = async (fileList) => {
-    const files = Array.from(fileList);
-    for (const file of files) {
-      const id = `${Date.now()}-${Math.random()}`;
-      setUploads((u) => [...u, { id, name: file.name, progress: 0 }]);
-      try {
-        await uploadFile(file, folderId, (p) =>
-          setUploads((u) => u.map((x) => (x.id === id ? { ...x, progress: p } : x)))
-        );
-        setUploads((u) => u.filter((x) => x.id !== id));
-        showToast(`Uploaded "${file.name}"`);
-      } catch (e) {
-        setUploads((u) => u.map((x) => (x.id === id ? { ...x, error: e.message } : x)));
-        showToast(`Upload failed: ${e.message}`, true);
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    const items = files.map((file) => ({
+      id: `${Date.now()}-${Math.random()}`,
+      file,
+      name: file.name,
+      progress: 0,
+    }));
+    setUploads((prev) => [...prev, ...items.map(({ id, name, progress }) => ({ id, name, progress }))]);
+
+    const CONCURRENCY = 3;
+    let nextIdx = 0;
+    const worker = async () => {
+      while (nextIdx < items.length) {
+        const item = items[nextIdx++];
+        try {
+          await uploadFile(item.file, folderId, (p) =>
+            setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, progress: p } : x)))
+          );
+          setUploads((u) => u.filter((x) => x.id !== item.id));
+          showToast(`Uploaded "${item.name}"`);
+        } catch (e) {
+          setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, error: e.message } : x)));
+          showToast(`Upload failed: ${e.message}`, true);
+        }
       }
-    }
+    };
+    const workers = [];
+    for (let i = 0; i < Math.min(CONCURRENCY, items.length); i++) workers.push(worker());
+    await Promise.all(workers);
     load();
   };
 

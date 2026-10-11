@@ -48,6 +48,7 @@ export default function Dashboard() {
   const [savedFilter, setSavedFilter] = useState('all');
   // Mobile sidebar drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   // Close drawer whenever the user navigates to a different route
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
@@ -55,6 +56,23 @@ export default function Dashboard() {
   const handlers = useDashboardHandlers({
     categoryId, folderId, navigate, setUser, setCategories, setCurrentCategory, setCurrentFolder, setFolders, setFiles, setSavedMedia, setLoading, setToast, setUploads, setShowSavedPicker
   });
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    if ((view === 'category' || view === 'folder') && e.dataTransfer?.files?.length) {
+      handlers.handleUploadFromComputer(e.dataTransfer.files);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    if (view === 'category' || view === 'folder') setDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    if (e.currentTarget === e.target) setDragOver(false);
+  };
 
   // E2EE-aware download: encrypted files are fetched + decrypted in the
   // browser; legacy plaintext files keep the direct streaming link.
@@ -66,7 +84,13 @@ export default function Dashboard() {
         setTimeout(() => setToast(null), 3500);
         return;
       }
-      if (await downloadDecrypted(f, key)) return;
+      try {
+        if (await downloadDecrypted(f, key)) return;
+      } catch (err) {
+        setToast({ msg: `Decryption failed: ${err.message}`, isError: true });
+        setTimeout(() => setToast(null), 3500);
+        return;
+      }
     }
     window.open(`/api/files/${f.id}/download`, '_blank');
   };
@@ -121,7 +145,21 @@ export default function Dashboard() {
         mobileOpen={drawerOpen}
         onCloseMenu={() => setDrawerOpen(false)}
       />
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <main
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        className="relative flex min-w-0 flex-1 flex-col overflow-hidden"
+      >
+        {dragOver && (
+          <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-indigo-900/60 backdrop-blur-sm">
+            <div className="rounded-2xl border-2 border-dashed border-white/80 bg-white/10 px-8 py-6 text-center text-white shadow-2xl">
+              <div className="mb-2 text-4xl">📤</div>
+              <p className="text-lg font-bold">Drop files here to upload</p>
+              <p className="text-xs text-white/80">Multiple files will upload in parallel to Telegram</p>
+            </div>
+          </div>
+        )}
         {view === 'saved' && (
           <SavedMessagesView
             loading={loading} savedMedia={savedMedia} savedFilter={savedFilter}

@@ -50,16 +50,26 @@ function Thumb({ item }) {
   const ic = fileIcon(item);
   // E2EE files store ciphertext at /raw — never render it as an image.
   const isImage = (item.mime || '').startsWith('image/') && !item.encrypted;
+  const thumbUrl = item.thumbnail || (item.id != null ? `/api/files/${item.id}/thumb` : null);
+
   return (
     <div
       className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ${ic.color}`}
     >
-      {isImage ? (
+      {isImage && thumbUrl ? (
         <img
-          src={`/api/files/${item.id}/raw`}
+          src={thumbUrl}
           alt=""
           loading="lazy"
           className="h-full w-full object-cover"
+          onError={(e) => {
+            if (item.id && !e.currentTarget.dataset.fallback) {
+              e.currentTarget.dataset.fallback = 'true';
+              e.currentTarget.src = `/api/files/${item.id}/raw`;
+            } else {
+              e.currentTarget.style.display = 'none';
+            }
+          }}
         />
       ) : (
         <span className="text-lg">{ic.icon}</span>
