@@ -9,6 +9,14 @@ export default function Login() {
   const [config, setConfig] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState(64);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setUploadPercent((prev) => (prev >= 98 ? 14 : prev + 2));
+    }, 160);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     api.get('/api/auth/config').then(setConfig).catch(() => setConfig({}));
@@ -65,7 +73,7 @@ export default function Login() {
         <ThemeToggle />
       </div>
 
-      {/* Left hero: Product Showcase & Infinite Cloud Preview */}
+      {/* Left hero: Product Showcase & Cloud Drive Preview */}
       <div className="relative flex flex-1 flex-col justify-between overflow-hidden bg-gradient-to-br from-indigo-900 via-[#101728] to-slate-950 px-6 py-10 text-white sm:px-12 sm:py-16 lg:px-16 lg:py-20">
         {/* Glow backdrop circles */}
         <div className="pointer-events-none absolute -left-20 -top-20 h-96 w-96 rounded-full bg-sky-500/15 blur-3xl" />
@@ -97,17 +105,17 @@ export default function Login() {
           </div>
 
           <h1 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl leading-tight">
-            Infinite Cloud Storage,{' '}
+            Cloud Storage,{' '}
             <span className="bg-gradient-to-r from-sky-400 via-sky-300 to-indigo-300 bg-clip-text text-transparent">
-              Powered by Telegram
+              Powered by TGSTORE
             </span>
           </h1>
 
           <p className="mt-4 text-sm leading-relaxed text-slate-300 sm:text-base">
-            Turn your Telegram account into an unlimited, high-speed private drive. Every file is automatically chunked, safely stored, and instantly streamable in your browser.
+            Turn your Telegram account into a high-speed private drive. Every file is automatically chunked, safely stored, and instantly streamable in your browser.
           </p>
-          {/* Interactive Drive UI Mockup */}
-          <div className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 p-4 shadow-2xl backdrop-blur-xl">
+          {/* Interactive Drive UI Mockup with Live Upload Animation */}
+          <div className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl backdrop-blur-xl">
             <div className="mb-3 flex items-center justify-between border-b border-white/5 pb-3">
               <div className="flex items-center gap-2">
                 <div className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
@@ -115,8 +123,9 @@ export default function Login() {
                 <div className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
                 <span className="ml-2 font-mono text-xs text-slate-400">tgstore://my-vault</span>
               </div>
-              <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/20">
-                Live Sync
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 ring-1 ring-emerald-500/20">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Sync Active
               </span>
             </div>
 
@@ -129,15 +138,51 @@ export default function Login() {
                   </svg>
                   Telegram Cloud Storage
                 </span>
-                <span className="text-sky-300 font-mono">142.8 GB / ∞</span>
+                <span className="text-sky-300 font-mono">142.8 GB Uploaded</span>
               </div>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
                 <div className="h-full w-2/5 rounded-full bg-gradient-to-r from-sky-400 to-indigo-500" />
               </div>
             </div>
 
-            {/* Mock file cards */}
-            <div className="space-y-1.5 font-mono text-xs">
+            {/* Mock file cards with Live Upload Animation */}
+            <div className="space-y-2 font-mono text-xs">
+              {/* Active animated upload item */}
+              <div className="relative overflow-hidden rounded-xl border border-sky-400/30 bg-sky-500/[0.09] p-2.5 ring-1 ring-sky-400/20 backdrop-blur">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 overflow-hidden">
+                    <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-sky-500/20 text-sky-300">
+                      <svg className="h-4 w-4 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                    </div>
+                    <div className="overflow-hidden">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate font-semibold text-white">Project_Raw_Footage.mp4</span>
+                        <span className="rounded bg-sky-400/20 px-1 py-0.5 text-[9px] font-semibold text-sky-300">
+                          CHUNK 14/20
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[10px] text-sky-200/80">
+                        Uploading • 18.4 MB/s • {Math.round((uploadPercent * 480) / 100)} MB / 480 MB
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 text-right">
+                    <span className="font-mono text-xs font-bold text-sky-300">{uploadPercent}%</span>
+                  </div>
+                </div>
+
+                {/* Progress bar with smooth glowing transition */}
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-800/80">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-sky-400 via-indigo-400 to-sky-300 transition-all duration-200 shadow-sm shadow-sky-400/50"
+                    style={{ width: `${uploadPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Completed file card 1 */}
               <div className="flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2 text-slate-200">
                 <div className="flex items-center gap-2 overflow-hidden">
                   <span className="text-sm">🎬</span>
@@ -149,6 +194,7 @@ export default function Login() {
                 </div>
               </div>
 
+              {/* Completed file card 2 */}
               <div className="flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2 text-slate-200">
                 <div className="flex items-center gap-2 overflow-hidden">
                   <span className="text-sm">🔐</span>
