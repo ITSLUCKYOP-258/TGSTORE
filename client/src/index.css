@@ -1,7 +1,13 @@
 @import 'tailwindcss';
 
+/* Follow the OS light/dark preference (no manual toggle needed). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
 }
 
 html,
@@ -25,7 +31,16 @@ body {
   -webkit-tap-highlight-color: transparent;
   /* Prevent pull-to-refresh overscroll bounce on the body */
   overscroll-behavior: none;
-  @apply bg-slate-100 text-slate-800 antialiased;
+  background-color: #f8fafc;
+  color: #0f172a;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark body,
+html.dark body {
+  background-color: #0e1621;
+  color: #f1f5f9;
 }
 
 /* thin scrollbars */
@@ -34,7 +49,7 @@ body {
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-slate-300;
+  @apply rounded-full bg-slate-300 dark:bg-white/10;
 }
 *::-webkit-scrollbar-track {
   background: transparent;

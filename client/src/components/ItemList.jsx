@@ -13,7 +13,7 @@ export function ContextMenu({ x, y, actions, onClose }) {
         }}
       />
       <div
-        className="fixed z-50 min-w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl"
+        className="fixed z-50 min-w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl dark:border-white/10 dark:bg-[#17212b]"
         style={{
           left: Math.min(x, window.innerWidth - 200),
           top: Math.min(y, window.innerHeight - 40 - actions.length * 36),
@@ -26,8 +26,8 @@ export function ContextMenu({ x, y, actions, onClose }) {
               onClose();
               a.onClick();
             }}
-            className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition hover:bg-slate-50 ${
-              a.danger ? 'text-red-600' : 'text-slate-700'
+            className={`flex w-full items-center gap-3 px-4 py-2 text-left text-sm transition hover:bg-slate-50 dark:hover:bg-white/5 ${
+              a.danger ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'
             }`}
           >
             <span className="w-4 text-center text-xs">{a.icon}</span>
