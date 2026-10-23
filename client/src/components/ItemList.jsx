@@ -1,4 +1,6 @@
 import { fileIcon, formatBytes, formatDate } from '../lib/format.js';
+import SecureThumb from './SecureThumb.jsx';
+import { isArmored } from '../lib/vault.js';
 
 /** Context menu shown on right-click / ⋯ button. */
 export function ContextMenu({ x, y, actions, onClose }) {
@@ -48,9 +50,25 @@ function Thumb({ item }) {
     );
   }
   const ic = fileIcon(item);
-  // E2EE files store ciphertext at /raw — never render it as an image.
-  const isImage = (item.mime || '').startsWith('image/') && !item.encrypted;
+  const isEncrypted = Boolean(item.encrypted || isArmored(item.name));
+  const isImage = (item.mime || '').startsWith('image/');
   const thumbUrl = item.thumbnail || (item.id != null ? `/api/files/${item.id}/thumb` : null);
+
+  if (item._localUrl) {
+    return (
+      <div className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ${ic.color}`}>
+        <img src={item._localUrl} alt="" className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+
+  if (isEncrypted && isImage && item.id) {
+    return (
+      <div className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl ${ic.color}`}>
+        <SecureThumb item={item} fallback={<span className="text-lg">{ic.icon}</span>} />
+      </div>
+    );
+  }
 
   return (
     <div

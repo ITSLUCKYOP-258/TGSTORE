@@ -6,6 +6,41 @@
 import { rawUrl } from '../api.js';
 import { decryptMetadata, decryptFile, isVaultError } from './crypto';
 
+const EXT_MIME = {
+  mp4: 'video/mp4',
+  m4v: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  mkv: 'video/x-matroska',
+  avi: 'video/x-msvideo',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  oga: 'audio/ogg',
+  opus: 'audio/opus',
+  m4a: 'audio/mp4',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  svg: 'image/svg+xml',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  json: 'application/json',
+};
+
+export function resolveMime(name, mime) {
+  if (mime && mime !== 'application/octet-stream') return mime;
+  const ext = String(name || '').split('.').pop().toLowerCase();
+  return EXT_MIME[ext] || mime || 'application/octet-stream';
+}
+
 /** True when a name/metadata string is an armored ciphertext ("TGS1:…"). */
 export const isArmored = (s) => typeof s === 'string' && s.startsWith('TGS1:');
 
@@ -45,21 +80,40 @@ export async function withDecryptedMeta(files, key) {
  */
 export async function decryptToObjectUrl(file, key) {
   if (!file?.id || !key) return null;
+  let name = file.name || 'file';
+  let mime = file.mime || 'application/octet-stream';
+
+  if (isArmored(name)) {
+    try {
+      const m = await decryptMetadata(name, key);
+      name = m.name || name;
+      mime = m.mime || mime;
+    } catch {}
+  }
+
   const res = await fetch(rawUrl(file.id), { credentials: 'include' });
   if (!res.ok) return null;
   const cipher = await res.blob();
   const plain = await decryptFile(cipher, key);
-  const url = URL.createObjectURL(new Blob([plain], { type: file.mime || 'application/octet-stream' }));
-  return { url, revoke: () => URL.revokeObjectURL(url) };
+  const finalMime = resolveMime(name, mime);
+  const url = URL.createObjectURL(new Blob([plain], { type: finalMime }));
+  return { url, name, mime: finalMime, revoke: () => URL.revokeObjectURL(url) };
 }
 
 /** Decrypt + download a stored file with the real filename. */
 export async function downloadDecrypted(file, key) {
+  if (file?._localUrl) {
+    const a = document.createElement('a');
+    a.href = file._localUrl;
+    a.download = file.name || 'download';
+    a.click();
+    return true;
+  }
   const handle = await decryptToObjectUrl(file, key);
   if (!handle) return false;
   const a = document.createElement('a');
   a.href = handle.url;
-  a.download = file.name || 'download';
+  a.download = handle.name || file.name || 'download';
   a.click();
   setTimeout(handle.revoke, 60_000); // allow the browser time to start the save
   return true;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { rawUrl } from '../api.js';
 import { useVault } from '../hooks/useVault';
-import { decryptToObjectUrl, downloadDecrypted } from '../lib/vault.js';
+import { decryptToObjectUrl, downloadDecrypted, isArmored, resolveMime } from '../lib/vault.js';
 
 function previewExt(name) {
   return String(name || '').split('.').pop().toLowerCase();
@@ -35,20 +35,6 @@ function previewSrc(item) {
   if (item.url) return item.url;
   if (item.id != null) return rawUrl(item.id);
   return '';
-}
-
-const EXT_MIME = {
-  mp4:'video/mp4', m4v:'video/mp4', webm:'video/webm', mov:'video/quicktime',
-  mkv:'video/x-matroska', avi:'video/x-msvideo',
-  mp3:'audio/mpeg', wav:'audio/wav', ogg:'audio/ogg', oga:'audio/ogg',
-  opus:'audio/opus', m4a:'audio/mp4', flac:'audio/flac', aac:'audio/aac',
-  jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif',
-  webp:'image/webp', bmp:'image/bmp', svg:'image/svg+xml',
-};
-function resolveMime(name, mime) {
-  if (mime && mime !== 'application/octet-stream') return mime;
-  const ext = String(name || '').split('.').pop().toLowerCase();
-  return EXT_MIME[ext] || mime || 'application/octet-stream';
 }
 
 function fileIcon(item) {
@@ -228,23 +214,38 @@ function ImagePreview({ item, fullSrc }) {
 export default function MediaPreview({ item, onClose }) {
   const vault = useVault();
   // Decrypted object URL for E2EE files (null until resolved)
-  const [decUrl, setDecUrl] = useState(null);
+  const [decUrl, setDecUrl] = useState(item?._localUrl ? { url: item._localUrl, name: item.name, mime: item.mime } : null);
   const [decrypting, setDecrypting] = useState(false);
   const [decryptError, setDecryptError] = useState(null);
 
+  const isEncrypted = Boolean(item?.encrypted || isArmored(item?.name));
+
   useEffect(() => {
-    setDecUrl(null);
-    setDecryptError(null);
-    if (!item?.encrypted || !item?.id) {
+    if (item?._localUrl) {
+      setDecUrl({ url: item._localUrl, name: item.name, mime: item.mime });
       setDecrypting(false);
       return undefined;
     }
+
+    setDecUrl(null);
+    setDecryptError(null);
+
+    if (!isEncrypted || !item?.id) {
+      setDecrypting(false);
+      return undefined;
+    }
+
     const key = vault.getKey();
     if (!key) {
+      if (vault.status === 'unlocking') {
+        setDecrypting(true);
+        return undefined;
+      }
       setDecryptError('Vault is locked. Unlock vault to preview this encrypted file.');
       setDecrypting(false);
       return undefined;
     }
+
     let active = true;
     setDecrypting(true);
     decryptToObjectUrl(item, key)
@@ -262,22 +263,30 @@ export default function MediaPreview({ item, onClose }) {
       .finally(() => {
         if (active) setDecrypting(false);
       });
+
     return () => {
       active = false;
+      if (decUrl?.revoke && !item?._localUrl) decUrl.revoke();
     };
-  }, [item?.id, item?.encrypted]);
+  }, [item?.id, item?.name, item?.encrypted, item?._localUrl, isEncrypted, vault.status]);
 
   if (!item) return null;
-  const kind = previewKind(item);
-  // For encrypted files, ONLY use decrypted object URL
-  const src = item.encrypted ? decUrl?.url : (decUrl?.url || previewSrc(item));
+
+  const activeItem = {
+    ...item,
+    name: decUrl?.name || item.name,
+    mime: decUrl?.mime || item.mime,
+    encrypted: isEncrypted,
+  };
+  const kind = previewKind(activeItem);
+  const src = isEncrypted ? decUrl?.url : (decUrl?.url || previewSrc(item));
 
   const handleDownloadClick = async () => {
-    if (item.encrypted) {
+    if (isEncrypted) {
       if (decUrl?.url) {
         const a = document.createElement('a');
         a.href = decUrl.url;
-        a.download = item.name || 'download';
+        a.download = activeItem.name || item.name || 'download';
         a.click();
       } else {
         const key = vault.getKey();
@@ -309,16 +318,16 @@ export default function MediaPreview({ item, onClose }) {
         >✕</button>
 
         <div className="rounded-2xl overflow-hidden bg-slate-900 shadow-2xl">
-          {item.encrypted && decrypting ? (
+          {isEncrypted && decrypting && !decUrl ? (
             <div className="flex flex-col items-center justify-center py-24 text-white">
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-sky-400 mb-4" />
               <p className="text-base font-semibold">Decrypting file…</p>
               <p className="text-xs text-slate-400 mt-1">Decrypting with your vault key</p>
             </div>
-          ) : item.encrypted && decryptError ? (
+          ) : isEncrypted && decryptError && !decUrl ? (
             <div className="flex flex-col items-center justify-center py-20 px-6 text-center text-white">
               <div className="text-5xl mb-3">🔒</div>
-              <p className="text-lg font-semibold">{item.name}</p>
+              <p className="text-lg font-semibold">{activeItem.name}</p>
               <p className="mt-2 text-sm text-red-400 max-w-md">{decryptError}</p>
               <p className="mt-3 text-xs text-slate-400">Unlock your vault or check your passphrase to preview.</p>
             </div>
@@ -327,29 +336,29 @@ export default function MediaPreview({ item, onClose }) {
               {kind === 'video' && src && (
                 <video key={src} controls preload="metadata" playsInline
                   className="w-full object-contain bg-black" style={{ maxHeight: '70dvh' }}>
-                  <source src={src} type={resolveMime(item.name, item.mime)} />
+                  <source src={src} type={resolveMime(activeItem.name, activeItem.mime)} />
                 </video>
               )}
               {kind === 'audio' && src && (
                 <div className="flex flex-col items-center justify-center px-8 py-12">
                   <div className="mb-4 text-6xl">🎵</div>
-                  <p className="mb-5 px-4 text-center text-base font-medium text-white">{item.name}</p>
+                  <p className="mb-5 px-4 text-center text-base font-medium text-white">{activeItem.name}</p>
                   <audio key={src} controls preload="metadata" className="w-full max-w-md">
-                    <source src={src} type={resolveMime(item.name, item.mime)} />
+                    <source src={src} type={resolveMime(activeItem.name, activeItem.mime)} />
                   </audio>
                 </div>
               )}
               {kind === 'image' && (
-                <ImagePreview item={item} fullSrc={src} />
+                <ImagePreview item={activeItem} fullSrc={src} />
               )}
               {kind === 'pdf' && src && <PdfViewer src={src} />}
-              {kind === 'text' && src && <TextViewer src={src} name={item.name} />}
+              {kind === 'text' && src && <TextViewer src={src} name={activeItem.name} />}
               {kind === 'other' && (
                 <div className="flex flex-col items-center justify-center py-16 text-white">
-                  <div className="mb-4 text-7xl">{fileIcon(item)}</div>
-                  <p className="text-lg font-medium">{item.name}</p>
-                  {item.mime && <p className="mt-1 text-sm text-white/50">{item.mime}</p>}
-                  {item.size && <p className="mt-1 text-xs text-white/40">{formatBytes(item.size)}</p>}
+                  <div className="mb-4 text-7xl">{fileIcon(activeItem)}</div>
+                  <p className="text-lg font-medium">{activeItem.name}</p>
+                  {activeItem.mime && <p className="mt-1 text-sm text-white/50">{activeItem.mime}</p>}
+                  {activeItem.size && <p className="mt-1 text-xs text-white/40">{formatBytes(activeItem.size)}</p>}
                   <p className="mt-4 text-sm text-white/40">No preview available — download to open</p>
                 </div>
               )}
@@ -360,10 +369,10 @@ export default function MediaPreview({ item, onClose }) {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 px-1 pb-safe">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-white flex items-center gap-1.5">
-              <span>{item.name}</span>
-              {item.encrypted && <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">🔒 E2EE</span>}
+              <span>{activeItem.name}</span>
+              {isEncrypted && <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-sky-300">🔒 E2EE</span>}
             </p>
-            {item.size && <p className="text-xs text-white/60">{formatBytes(item.size)}</p>}
+            {activeItem.size && <p className="text-xs text-white/60">{formatBytes(activeItem.size)}</p>}
             {(kind === 'video' || kind === 'audio') && (
               <p className="mt-0.5 text-xs text-white/50">🔊 Use the player's volume slider</p>
             )}

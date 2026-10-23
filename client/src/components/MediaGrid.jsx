@@ -1,65 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { rawUrl } from '../api.js';
-import { useVault } from '../hooks/useVault';
-import { decryptFile } from '../lib/crypto';
-
-/**
- * E2EE thumbnail: lazily fetches the stored ciphertext when the tile
- * scrolls into view, decrypts it in the browser with the vault key and
- * renders the real image via a temporary object URL. Telegram/server only
- * ever see ciphertext; the plaintext exists only in this tab's memory.
- */
-function SecureThumb({ item, fallback }) {
-  const vault = useVault();
-  const [url, setUrl] = useState(null);
-  const holder = useRef(null);
-  const started = useRef(false);
-  const createdUrl = useRef(null);
-
-  useEffect(() => {
-    const el = holder.current;
-    if (!el) return undefined;
-    const start = () => {
-      if (started.current) return;
-      started.current = true;
-      const key = vault.getKey();
-      if (!key) return; // vault locked — icon stays
-      fetch(rawUrl(item.id), { credentials: 'include' })
-        .then((r) => (r.ok ? r.blob() : Promise.reject(new Error('raw fetch failed'))))
-        .then((cipher) => decryptFile(cipher, key))
-        .then((plain) => {
-          const u = URL.createObjectURL(new Blob([plain], { type: item.mime || 'application/octet-stream' }));
-          createdUrl.current = u;
-          setUrl(u);
-        })
-        .catch(() => { /* keep icon fallback */ });
-    };
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          start();
-          io.disconnect();
-        }
-      },
-      { rootMargin: '300px' } // start slightly before the tile is visible
-    );
-    io.observe(el);
-    return () => {
-      io.disconnect();
-      if (createdUrl.current) URL.revokeObjectURL(createdUrl.current);
-    };
-  }, [item.id]);
-
-  return (
-    <div ref={holder} className="absolute inset-0 flex h-full w-full items-center justify-center">
-      {url ? (
-        <img src={url} alt={item.name || ''} className="h-full w-full object-cover" />
-      ) : (
-        <span className="text-4xl">{fallback}</span>
-      )}
-    </div>
-  );
-}
+import SecureThumb from './SecureThumb.jsx';
+import { isArmored } from '../lib/vault.js';
 
 export default function MediaGrid({ media, onPreview, onDownload, onDelete, showSavedBadge }) {
   if (!media || media.length === 0) {
@@ -74,7 +14,9 @@ export default function MediaGrid({ media, onPreview, onDownload, onDelete, show
   return (
     <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {media.map((item, idx) => {
-        const hasThumb = Boolean(item.thumbnail || (item.encrypted && item.id && gridKind(item) === 'image'));
+        const isEncrypted = Boolean(item.encrypted || isArmored(item.name));
+        const isImage = gridKind(item) === 'image';
+        const hasThumb = Boolean(item.thumbnail || item._localUrl || (isEncrypted && item.id && isImage));
 
         return (
           <div
@@ -84,7 +26,9 @@ export default function MediaGrid({ media, onPreview, onDownload, onDelete, show
             }`}
             onClick={() => onPreview?.(item)}
           >
-            {item.encrypted && item.id && gridKind(item) === 'image' ? (
+            {item._localUrl ? (
+              <img src={item._localUrl} alt={item.name} className="h-full w-full object-cover" />
+            ) : isEncrypted && item.id && isImage ? (
               /* E2EE image: decrypt-on-scroll thumbnail — Telegram never sees it */
               <SecureThumb item={item} fallback={gridIcon(item)} />
             ) : (

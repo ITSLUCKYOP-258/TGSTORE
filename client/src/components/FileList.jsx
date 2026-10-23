@@ -1,12 +1,31 @@
 import { useState } from 'react';
 import { fileIcon, formatBytes } from '../lib/format.js';
 import { ContextMenu } from './ItemList.jsx';
+import SecureThumb from './SecureThumb.jsx';
+import { isArmored } from '../lib/vault.js';
 
 /** File type icon tile. */
 function Thumb({ item }) {
   const ic = fileIcon(item);
-  const isImage = (item.mime || '').startsWith('image/') && !item.encrypted;
+  const isEncrypted = Boolean(item.encrypted || isArmored(item.name));
+  const isImage = (item.mime || '').startsWith('image/');
   const thumbUrl = item.thumbnail || (item.id != null ? `/api/files/${item.id}/thumb` : null);
+
+  if (item._localUrl) {
+    return (
+      <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl ${ic.color}`}>
+        <img src={item._localUrl} alt="" className="h-full w-full object-cover" />
+      </div>
+    );
+  }
+
+  if (isEncrypted && isImage && item.id) {
+    return (
+      <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl ${ic.color}`}>
+        <SecureThumb item={item} fallback={<span className="text-lg">{ic.icon}</span>} />
+      </div>
+    );
+  }
 
   if (isImage && thumbUrl) {
     return (
@@ -66,6 +85,7 @@ export default function FileList({ files, onPreview, onDownload, onDelete }) {
             {group.items.map((f) => (
               <div
                 key={f.id}
+                onClick={() => onPreview?.(f)}
                 onDoubleClick={() => onPreview?.(f)}
                 className="group flex cursor-pointer items-center gap-3 rounded-2xl border border-transparent bg-white p-2.5 transition hover:border-slate-200 hover:shadow-sm dark:border-white/5 dark:bg-[#17212b] dark:hover:border-white/10 dark:hover:bg-[#1d2b3a]"
               >

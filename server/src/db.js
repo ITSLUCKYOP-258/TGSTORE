@@ -89,6 +89,7 @@ function ensureColumn(table, column, ddl) {
 ensureColumn('users', 'mt_session', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('users', 'mt_phone', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('users', 'last_login', 'TEXT');
+ensureColumn('categories', 'access_hash', "TEXT NOT NULL DEFAULT ''");
 ensureColumn('folders', 'category_id', 'INTEGER REFERENCES categories(id)');
 ensureColumn('files', 'category_id', 'INTEGER REFERENCES categories(id)');
 ensureColumn('folders', 'channel_message_id', 'INTEGER NOT NULL DEFAULT 0');

@@ -50,14 +50,14 @@ export default function Categories() {
     api.get('/api/categories').then((d) => setCategories(d.categories)).catch((e) => showToast(e.message, true));
   }, []);
 
-  const loadCategoryContents = useCallback(() => {
+  const loadCategoryContents = useCallback((silent = false) => {
     if (categoryId == null) {
       setData({ folders: [], files: [], breadcrumbs: [] });
       setCurrentCategory(null);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     api
       .get(`/api/drive?categoryId=${categoryId}${folderId != null ? `&folder=${folderId}` : ''}`)
       .then(async (d) => {
@@ -65,7 +65,7 @@ export default function Categories() {
         setData({ folders: d.folders || [], files: decryptedFiles, breadcrumbs: d.breadcrumbs || [] });
       })
       .catch((e) => showToast(e.message, true))
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }, [categoryId, folderId, vault.status]);
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
@@ -108,7 +108,7 @@ export default function Categories() {
             uploadPayload = encrypted;
           }
 
-          await uploadFile(
+          const res = await uploadFile(
             uploadPayload,
             folderId,
             (p) => setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, progress: p } : x))),
@@ -117,6 +117,18 @@ export default function Categories() {
             metaArmor
           );
           setUploads((u) => u.filter((x) => x.id !== item.id));
+
+          if (res?.file) {
+            const [decrypted] = await withDecryptedMeta([res.file], key);
+            try {
+              decrypted._localUrl = URL.createObjectURL(item.file);
+            } catch {}
+            setData((prev) => ({
+              ...prev,
+              files: [decrypted, ...(prev?.files || []).filter((f) => f.id !== decrypted.id)],
+            }));
+          }
+
           showToast(`Uploaded ${item.name}`);
         } catch (e) {
           setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, error: e.message } : x)));
@@ -126,7 +138,7 @@ export default function Categories() {
     const workers = [];
     for (let i = 0; i < Math.min(CONCURRENCY, items.length); i++) workers.push(worker());
     await Promise.all(workers);
-    loadCategoryContents();
+    loadCategoryContents(true);
   };
 
   const createCategory = async () => {

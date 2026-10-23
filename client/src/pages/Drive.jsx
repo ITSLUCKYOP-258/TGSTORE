@@ -58,9 +58,9 @@ export default function Drive() {
     api.get('/api/storage').then(setStats).catch(() => {});
   }, []);
 
-  const load = useCallback(() => {
+  const load = useCallback((silent = false) => {
     if (view === 'shared') return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     const url = `/api/drive?view=${view}${
       view === 'search' ? `&q=${encodeURIComponent(q)}` : ''
     }${view === 'drive' ? `&folder=${folderId ?? ''}` : ''}`;
@@ -71,7 +71,7 @@ export default function Drive() {
         setData({ ...(res || {}), files: decryptedFiles });
       })
       .catch((e) => setToast({ msg: e.message, isError: true }))
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
     refreshStats();
   }, [view, folderId, q, refreshStats, vault.status]);
 
@@ -115,7 +115,7 @@ export default function Drive() {
             uploadPayload = encrypted;
           }
 
-          await uploadFile(
+          const res = await uploadFile(
             uploadPayload,
             folderId,
             (p) => setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, progress: p } : x))),
@@ -124,6 +124,18 @@ export default function Drive() {
             metaArmor
           );
           setUploads((u) => u.filter((x) => x.id !== item.id));
+
+          if (res?.file) {
+            const [decrypted] = await withDecryptedMeta([res.file], key);
+            try {
+              decrypted._localUrl = URL.createObjectURL(item.file);
+            } catch {}
+            setData((prev) => ({
+              ...prev,
+              files: [decrypted, ...(prev?.files || []).filter((f) => f.id !== decrypted.id)],
+            }));
+          }
+
           showToast(`Uploaded "${item.name}"`);
         } catch (e) {
           setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, error: e.message } : x)));
@@ -134,7 +146,7 @@ export default function Drive() {
     const workers = [];
     for (let i = 0; i < Math.min(CONCURRENCY, items.length); i++) workers.push(worker());
     await Promise.all(workers);
-    load();
+    load(true);
   };
 
   const starToggle = async (item) => {

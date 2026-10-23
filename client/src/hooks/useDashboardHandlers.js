@@ -19,7 +19,23 @@ export function useDashboardHandlers({
   
   const loadCategories = useCallback(async () => { try { const { categories } = await api.listCategories(); setCategories(categories || []); } catch (e) { showToast(e.message, true); } }, []);
   const loadSavedMessages = useCallback(async (filter = 'all') => { try { setLoading(true); const { media } = await api.savedMessages(filter); setSavedMedia(media || []); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, []);
-  const loadCategoryContents = useCallback(async () => { if (!categoryId) return; try { setLoading(true); const cats = await api.listCategories(); setCurrentCategory(cats?.categories?.find(c => String(c.id) === String(categoryId)) || null); const { folders, currentFolder } = await api.listFolders(categoryId, folderId || null); setFolders(folders || []); setCurrentFolder(currentFolder || null); const { files } = await api.listFiles(categoryId, folderId || null); setFiles(await withDecryptedMeta(files || [], vault.getKey())); } catch (e) { showToast(e.message, true); } finally { setLoading(false); } }, [categoryId, folderId, vault.status]);
+  const loadCategoryContents = useCallback(async (silent = false) => {
+    if (!categoryId) return;
+    try {
+      if (!silent) setLoading(true);
+      const cats = await api.listCategories();
+      setCurrentCategory(cats?.categories?.find(c => String(c.id) === String(categoryId)) || null);
+      const { folders, currentFolder } = await api.listFolders(categoryId, folderId || null);
+      setFolders(folders || []);
+      setCurrentFolder(currentFolder || null);
+      const { files } = await api.listFiles(categoryId, folderId || null);
+      setFiles(await withDecryptedMeta(files || [], vault.getKey()));
+    } catch (e) {
+      showToast(e.message, true);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [categoryId, folderId, vault.status]);
 
   const handleCreateCategory = useCallback(async (name) => {
     if (!name?.trim()) { showToast('Category name is required', true); return; }
@@ -93,7 +109,7 @@ export function useDashboardHandlers({
             uploadPayload = encrypted;
           }
 
-          await uploadFile(
+          const res = await uploadFile(
             uploadPayload,
             folderId,
             (p) => setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, progress: p } : x))),
@@ -102,6 +118,15 @@ export function useDashboardHandlers({
             metaArmor
           );
           setUploads((u) => u.filter((x) => x.id !== item.id));
+
+          if (res?.file) {
+            const [decrypted] = await withDecryptedMeta([res.file], key);
+            try {
+              decrypted._localUrl = URL.createObjectURL(item.file);
+            } catch {}
+            setFiles((prev) => [decrypted, ...(prev || []).filter((f) => f.id !== decrypted.id)]);
+          }
+
           showToast(`Uploaded ${item.name}`);
         } catch (e) {
           setUploads((u) => u.map((x) => (x.id === item.id ? { ...x, error: e.message } : x)));
@@ -114,8 +139,8 @@ export function useDashboardHandlers({
       workers.push(worker());
     }
     await Promise.all(workers);
-    loadCategoryContents();
-  }, [categoryId, folderId, loadCategoryContents, setUploads, showToast, vault]);
+    loadCategoryContents(true);
+  }, [categoryId, folderId, loadCategoryContents, setFiles, setUploads, showToast, vault]);
 
 
   const handleUploadFromSaved = useCallback(async (selectedMedia) => {
@@ -131,7 +156,7 @@ export function useDashboardHandlers({
       while (nextIdx < mediaList.length) {
         const media = mediaList[nextIdx++];
         try {
-          await api.uploadFromSaved(
+          const res = await api.uploadFromSaved(
             media.id,
             categoryId,
             folderId,
@@ -139,6 +164,10 @@ export function useDashboardHandlers({
             media.mime || 'application/octet-stream',
             media.size || 0
           );
+          if (res?.file) {
+            const [decrypted] = await withDecryptedMeta([res.file], vault.getKey());
+            setFiles((prev) => [decrypted, ...(prev || []).filter((f) => f.id !== decrypted.id)]);
+          }
           showToast(`Uploaded ${media.name || 'media'}`);
         } catch (e) {
           showToast(`Failed: ${e.message}`, true);
@@ -151,8 +180,8 @@ export function useDashboardHandlers({
       workers.push(worker());
     }
     await Promise.all(workers);
-    loadCategoryContents();
-  }, [categoryId, folderId, loadCategoryContents, setShowSavedPicker, showToast]);
+    loadCategoryContents(true);
+  }, [categoryId, folderId, loadCategoryContents, setFiles, setShowSavedPicker, showToast, vault]);
   const handleLogout = useCallback(async () => {
     try { await api.logout(); } catch { /* clear locally even if the call fails */ }
     // Clear persisted token for Capacitor native builds

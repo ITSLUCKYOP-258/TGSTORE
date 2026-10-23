@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, rawUrl } from '../api.js';
 import { formatBytes, fileKind } from '../lib/format.js';
 import { useVault } from '../hooks/useVault';
-import { decryptToObjectUrl, downloadDecrypted } from '../lib/vault.js';
+import { decryptToObjectUrl, downloadDecrypted, isArmored, resolveMime } from '../lib/vault.js';
 
 export function ModalShell({ title, onClose, children, wide }) {
   useEffect(() => {
@@ -247,7 +247,10 @@ export function ShareModal({ file, onClose }) {
 function ModalImagePreview({ file, src }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const thumbSrc = file.thumbnail || (file.id != null ? `/api/files/${file.id}/thumb` : null);
+  const isEncrypted = Boolean(file?.encrypted || isArmored(file?.name));
+  const thumbSrc = !isEncrypted && !file?._localUrl
+    ? (file.thumbnail || (file.id != null ? `/api/files/${file.id}/thumb` : null))
+    : null;
 
   return (
     <div className="relative flex max-h-[65vh] min-h-64 w-full items-center justify-center overflow-hidden">
@@ -261,7 +264,7 @@ function ModalImagePreview({ file, src }) {
       {!loaded && !error && (
         <div className="absolute top-3 right-3 flex items-center gap-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] text-white/80 backdrop-blur-sm pointer-events-none">
           <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-sky-400" />
-          <span>Loading full quality...</span>
+          <span>{isEncrypted ? 'Decrypting quality...' : 'Loading full quality...'}</span>
         </div>
       )}
       <img
@@ -283,27 +286,43 @@ function ModalImagePreview({ file, src }) {
 }
 
 export function PreviewModal({ file, onClose }) {
-  const kind = fileKind(file);
   const vault = useVault();
-  const [decUrl, setDecUrl] = useState(null);
+  const [decUrl, setDecUrl] = useState(
+    file?._localUrl ? { url: file._localUrl, name: file.name, mime: file.mime } : null
+  );
 
   // E2EE: resolve decrypted bytes for encrypted stored files
   const [decrypting, setDecrypting] = useState(false);
   const [decryptError, setDecryptError] = useState(null);
 
+  const isEncrypted = Boolean(file?.encrypted || isArmored(file?.name));
+
   useEffect(() => {
-    setDecUrl(null);
-    setDecryptError(null);
-    if (!file?.encrypted || !file?.id) {
+    if (file?._localUrl) {
+      setDecUrl({ url: file._localUrl, name: file.name, mime: file.mime });
       setDecrypting(false);
       return undefined;
     }
+
+    setDecUrl(null);
+    setDecryptError(null);
+
+    if (!isEncrypted || !file?.id) {
+      setDecrypting(false);
+      return undefined;
+    }
+
     const key = vault.getKey();
     if (!key) {
+      if (vault.status === 'unlocking') {
+        setDecrypting(true);
+        return undefined;
+      }
       setDecryptError('Vault is locked. Unlock vault to view encrypted file.');
       setDecrypting(false);
       return undefined;
     }
+
     let active = true;
     setDecrypting(true);
     decryptToObjectUrl(file, key)
@@ -318,10 +337,21 @@ export function PreviewModal({ file, onClose }) {
       .finally(() => {
         if (active) setDecrypting(false);
       });
-    return () => { active = false; };
-  }, [file?.id, file?.encrypted]);
 
-  const src = file?.encrypted ? decUrl?.url : (decUrl?.url || rawUrl(file.id));
+    return () => {
+      active = false;
+      if (decUrl?.revoke && !file?._localUrl) decUrl.revoke();
+    };
+  }, [file?.id, file?.name, file?.encrypted, file?._localUrl, isEncrypted, vault.status]);
+
+  const activeFile = {
+    ...file,
+    name: decUrl?.name || file.name,
+    mime: decUrl?.mime || file.mime,
+    encrypted: isEncrypted,
+  };
+  const kind = fileKind(activeFile);
+  const src = isEncrypted ? decUrl?.url : (decUrl?.url || rawUrl(file.id));
   const [text, setText] = useState(null);
 
   useEffect(() => {
@@ -334,11 +364,11 @@ export function PreviewModal({ file, onClose }) {
   }, [src, kind]);
 
   const handleDownload = async () => {
-    if (file.encrypted) {
+    if (isEncrypted) {
       if (decUrl?.url) {
         const a = document.createElement('a');
         a.href = decUrl.url;
-        a.download = file.name || 'download';
+        a.download = activeFile.name || file.name || 'download';
         a.click();
       } else {
         const key = vault.getKey();
@@ -357,11 +387,11 @@ export function PreviewModal({ file, onClose }) {
   };
 
   return (
-    <ModalShell title={file.name} onClose={onClose} wide>
+    <ModalShell title={activeFile.name} onClose={onClose} wide>
       <div className="mb-3 flex items-center justify-between text-xs text-slate-400">
         <span>
-          {file.mime} · {formatBytes(file.size)}
-          {file.encrypted && ' · 🔒 E2EE'}
+          {activeFile.mime} · {formatBytes(activeFile.size)}
+          {isEncrypted && ' · 🔒 E2EE'}
         </span>
         <button
           type="button"
@@ -372,12 +402,12 @@ export function PreviewModal({ file, onClose }) {
         </button>
       </div>
       <div className="flex max-h-[65vh] min-h-64 items-center justify-center overflow-hidden rounded-xl bg-slate-950/95">
-        {file.encrypted && decrypting ? (
+        {isEncrypted && decrypting && !decUrl ? (
           <div className="flex flex-col items-center justify-center p-12 text-white">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-sky-400 mb-3" />
             <p className="text-sm font-medium">Decrypting file…</p>
           </div>
-        ) : file.encrypted && decryptError ? (
+        ) : isEncrypted && decryptError && !decUrl ? (
           <div className="p-10 text-center text-white">
             <div className="text-4xl mb-2">🔒</div>
             <p className="text-sm text-red-400">{decryptError}</p>
@@ -385,7 +415,7 @@ export function PreviewModal({ file, onClose }) {
         ) : (
           <>
             {kind === 'image' && (
-              <ModalImagePreview file={file} src={src} />
+              <ModalImagePreview file={activeFile} src={src} />
             )}
             {kind === 'video' && src && <video src={src} controls className="max-h-[65vh] w-full" />}
             {kind === 'audio' && src && (
@@ -395,22 +425,20 @@ export function PreviewModal({ file, onClose }) {
               </div>
             )}
             {kind === 'pdf' && src && (
-              <iframe src={src} title={file.name} className="h-[65vh] w-full rounded-xl bg-white" />
+              <iframe src={src} title={activeFile.name} className="h-[65vh] w-full rounded-xl bg-white" />
             )}
             {(kind === 'text' || kind === 'code') && src && (
               <pre className="max-h-[65vh] w-full overflow-auto p-6 text-left text-xs leading-relaxed text-emerald-200">
                 {text ?? 'Loading…'}
               </pre>
             )}
+            {!['image', 'video', 'audio', 'pdf', 'text', 'code'].includes(kind) && (
+              <div className="p-16 text-center text-white">
+                <div className="mb-3 text-5xl">📦</div>
+                <p className="text-sm text-slate-300">No preview available for this file type.</p>
+              </div>
+            )}
           </>
-        )}
-          </pre>
-        )}
-        {!['image', 'video', 'audio', 'pdf', 'text', 'code'].includes(kind) && (
-          <div className="p-16 text-center text-white">
-            <div className="mb-3 text-5xl">📦</div>
-            <p className="text-sm text-slate-300">No preview available for this file type.</p>
-          </div>
         )}
       </div>
     </ModalShell>

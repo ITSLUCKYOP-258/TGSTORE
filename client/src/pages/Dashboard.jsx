@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { api, uploadFile } from '../api.js';
 import { useVault } from '../hooks/useVault';
@@ -56,6 +56,18 @@ export default function Dashboard() {
   const handlers = useDashboardHandlers({
     categoryId, folderId, navigate, setUser, setCategories, setCurrentCategory, setCurrentFolder, setFolders, setFiles, setSavedMedia, setLoading, setToast, setUploads, setShowSavedPicker
   });
+
+  // Manual sync: re-fetch saved messages from Telegram
+  const refreshSaved = useCallback(() => handlers.loadSavedMessages(savedFilter), [handlers.loadSavedMessages, savedFilter]);
+
+  // Track previous view to auto-refetch saved messages when entering the Saved Messages view
+  const prevViewRef = useRef(view);
+  useEffect(() => {
+    if (prevViewRef.current !== view && view === 'saved') {
+      handlers.loadSavedMessages(savedFilter);
+    }
+    prevViewRef.current = view;
+  }, [view, savedFilter, handlers.loadSavedMessages]);
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -165,6 +177,7 @@ export default function Dashboard() {
             loading={loading} savedMedia={savedMedia} savedFilter={savedFilter}
             setSavedFilter={setSavedFilter} onPreview={setPreviewItem}
             onOpenMenu={() => setDrawerOpen(true)}
+            onRefresh={refreshSaved}
           />
         )}
         {view === 'category' && (

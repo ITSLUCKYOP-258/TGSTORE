@@ -1,6 +1,6 @@
 import MediaGrid from '../components/MediaGrid.jsx';
 
-export default function SavedMessagesView({ loading, savedMedia, savedFilter, setSavedFilter, onPreview, onOpenMenu }) {
+export default function SavedMessagesView({ loading, savedMedia, savedFilter, setSavedFilter, onPreview, onOpenMenu, onRefresh }) {
   return (
     <div className="flex-1 overflow-auto">
       <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-4 py-3 dark:border-white/5 dark:bg-[#17212b] sm:px-6 sm:py-4">
@@ -33,6 +33,18 @@ export default function SavedMessagesView({ loading, savedMedia, savedFilter, se
                 {f.charAt(0).toUpperCase() + f.slice(1)}
               </button>
             ))}
+            <button
+              onClick={onRefresh}
+              aria-label="Sync Saved Messages"
+              className={`min-h-9 rounded-full px-3.5 py-1 text-sm font-semibold transition flex items-center gap-2 ${
+                loading ? 'opacity-60 cursor-not-allowed' : 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20 dark:bg-[#3390ec] dark:shadow-none hover:bg-indigo-700'
+              }`}
+              disabled={loading}
+            >
+              {loading ? (
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              ) : '↻ Sync'}
+            </button>
           </div>
         </div>
       </div>
