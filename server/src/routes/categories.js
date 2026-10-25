@@ -13,7 +13,7 @@ const shapeCategory = (row) => ({
   id: row.id,
   name: row.name,
   channelId: row.channel_id,
-  channelActive: Boolean(row.channel_id && row.access_hash),
+  channelActive: Boolean(row.channel_id && (row.access_hash || process.env.STORAGE_CHANNEL_ID)),
   createdAt: row.created_at,
 });
 
@@ -28,24 +28,6 @@ router.post('/', async (req, res) => {
   const name = String(req.body?.name || '').trim();
   if (!name) return res.status(400).json({ error: 'Category name is required' });
 
-  // Validate MTProto configuration
-  if (!mtConfigured()) {
-    return res.status(400).json({
-      error: 'MTProto is not configured on this server. Cannot create channels.'
-    });
-  }
-
-  // Check user has MTProto session
-  const user = db.getUserById(req.userId);
-  if (!user?.mt_session) {
-    return res.status(401).json({
-      error: 'MTProto session required. Please login via phone number first.'
-    });
-  }
-  console.log(
-    `[categories] creating category name="${name}" user=${req.userId} phone=${user.mt_phone || 'n/a'}`
-  );
-
   // Prevent duplicate categories (case-insensitive)
   const existing = db.getCategoryByName(req.userId, name);
   if (existing) {
@@ -55,70 +37,77 @@ router.post('/', async (req, res) => {
     });
   }
 
+  const user = db.getUserById(req.userId);
   let channel = null;
   let channelId = null;
+  let accessHash = null;
   let botInvited = false;
 
-  try {
-    // Create the Telegram channel via the USER's MTProto session
-    channel = await createChannel(req.userId, `TGStore: ${name}`);
+  if (user?.mt_session && mtConfigured()) {
+    console.log(
+      `[categories] creating category name="${name}" user=${req.userId} phone=${user.mt_phone || 'n/a'}`
+    );
+    try {
+      // Create the Telegram channel via the USER's MTProto session
+      channel = await createChannel(req.userId, `TGStore: ${name}`);
 
-    if (!channel?.channelId) {
-      throw new Error('No channel ID returned from Telegram');
-    }
+      if (!channel?.channelId) {
+        throw new Error('No channel ID returned from Telegram');
+      }
 
-    // createChannel now returns the Bot API chat ID format (-100<id>) + accessHash
-    channelId = channel.channelId;
+      channelId = channel.channelId;
+      accessHash = channel.accessHash;
 
-    // Invite bot to the newly created channel (uses accessHash to address it).
-    // Best-effort only — the app streams via the user's own session, so the bot
-    // is only needed for the legacy Bot-API fallback.
-    const botUsername = process.env.BOT_USERNAME;
-    if (botUsername) {
-      botInvited = true;
-      try {
-        await inviteBotToChannel(
-          req.userId,
-          channel.rawChannelId,
-          channel.accessHash,
-          botUsername.replace('@', '')
-        );
-      } catch (inviteErr) {
-        botInvited = false;
-        const isBotPolicy = /USER_BOT|BOT_METHOD_INVALID|USER_NOT_PARTICIPANT/i.test(
-          String(inviteErr?.message)
-        );
-        if (isBotPolicy) {
-          console.log(
-            `⚠ [categories] bot @${botUsername} can't be auto-added to user channels ` +
-            `(${inviteErr.message}) — continuing, bot is optional.`
+      // Invite bot to the newly created channel (uses accessHash to address it).
+      const botUsername = process.env.BOT_USERNAME;
+      if (botUsername) {
+        botInvited = true;
+        try {
+          await inviteBotToChannel(
+            req.userId,
+            channel.rawChannelId,
+            channel.accessHash,
+            botUsername.replace('@', '')
           );
-        } else {
-          console.error(
-            `[categories] failed to invite bot to channel ${channelId} (user ${req.userId}):`,
-            inviteErr?.message
+        } catch (inviteErr) {
+          botInvited = false;
+          console.warn(
+            `[categories] bot @${botUsername} could not be invited to user channel: ${inviteErr.message}`
           );
         }
-        // Don't fail category creation — bot can be added manually
       }
+    } catch (err) {
+      console.error(
+        `[categories] failed to create Telegram channel (user ${req.userId}):`,
+        err.message
+      );
+      return res.status(err.status || 502).json({
+        error: `Failed to create Telegram channel: ${err.message}`
+      });
     }
-  } catch (err) {
-    console.error(
-      `[categories] failed to create Telegram channel (user ${req.userId}):`,
-      err.message
+  } else if (process.env.STORAGE_CHANNEL_ID) {
+    // User does not have an MTProto session (e.g. dev login):
+    // Fall back to the configured Bot API storage channel!
+    channelId = process.env.STORAGE_CHANNEL_ID;
+    accessHash = null;
+    channel = {
+      channelId,
+      botApiId: channelId,
+      title: name,
+      botInvited: true
+    };
+    console.log(
+      `[categories] created bot-fallback category name="${name}" user=${req.userId} channel=${channelId}`
     );
-    return res.status(err.status || 502).json({
-      error: `Failed to create Telegram channel: ${err.message}`
+  } else {
+    return res.status(400).json({
+      error: 'MTProto session or STORAGE_CHANNEL_ID is required to create categories.'
     });
   }
 
-  // Save category with the real Telegram channel ID + accessHash (required for
-  // every later MTProto operation on that channel).
-  const id = db.insertCategory(req.userId, name, channelId, channel.accessHash);
+  // Save category with the Telegram channel ID + accessHash
+  const id = db.insertCategory(req.userId, name, channelId, accessHash);
   const category = db.getCategory(id, req.userId);
-  console.log(
-    `[categories] created category id=${id} user=${req.userId} channel=${channelId} accessHash=${channel.accessHash}`
-  );
 
   res.status(201).json({
     category: shapeCategory(category),

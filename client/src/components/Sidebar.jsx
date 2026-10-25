@@ -5,7 +5,7 @@ import ThemeToggle from './ThemeToggle.jsx';
 
 /** Format bytes into a human-readable string */
 function formatBytes(bytes) {
-  if (bytes === 0) return '0 B';
+  if (!bytes || bytes <= 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return (bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
@@ -77,7 +77,7 @@ export default function Sidebar({
             <div
               key={cat.id}
               onClick={() => navigate(`/app/category/${cat.id}`)}
-              className={`group flex min-h-11 w-full cursor-pointer items-center justify-between rounded-lg px-3 text-sm transition ${categoryId === cat.id ? 'bg-indigo-50 text-indigo-700 font-bold dark:bg-sky-500/15 dark:text-sky-300' : 'text-slate-700 font-medium hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white'}`}
+              className={`group flex min-h-11 w-full cursor-pointer items-center justify-between rounded-lg px-3 text-sm transition ${Number(categoryId) === Number(cat.id) ? 'bg-indigo-50 text-indigo-700 font-bold dark:bg-sky-500/15 dark:text-sky-300' : 'text-slate-700 font-medium hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white'}`}
             >
               <span className="truncate">📁 {cat.name}</span>
               <button

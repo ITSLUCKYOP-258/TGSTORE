@@ -61,7 +61,6 @@ export default function CategoryView({
                   <input
                     type="file"
                     multiple
-                    accept="image/*,video/*,audio/*,application/*"
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files?.length) {
@@ -149,7 +148,6 @@ export default function CategoryView({
                   <input
                     type="file"
                     multiple
-                    accept="image/*,video/*,audio/*,application/*"
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files?.length) {

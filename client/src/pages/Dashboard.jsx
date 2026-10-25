@@ -14,7 +14,7 @@ import Toast from '../components/Toast.jsx';
 import SavedMessagesView from '../components/SavedMessagesView.jsx';
 import CategoryView from '../components/CategoryView.jsx';
 import FolderView from '../components/FolderView.jsx';
-import { useDashboardHandlers } from '../hooks/useDashboardHandlers.js';
+import { useDashboardHandlers } from '../hooks/useDashboardHandlers.jsx';
 
 export default function Dashboard() {
   const { user, setUser } = useAuth();
@@ -29,7 +29,8 @@ export default function Dashboard() {
   const pathMatch = /^\/app\/category\/(\d+)(?:\/folder\/(\d+))?/.exec(location.pathname);
   const categoryId = pathMatch ? Number(pathMatch[1]) : null;
   const folderId = pathMatch?.[2] ? Number(pathMatch[2]) : null;
-  
+  const view = !categoryId ? 'saved' : !folderId ? 'category' : 'folder';
+
   const [categories, setCategories] = useState([]);
   const [currentCategory, setCurrentCategory] = useState(null);
   const [currentFolder, setCurrentFolder] = useState(null);
@@ -54,7 +55,7 @@ export default function Dashboard() {
   useEffect(() => { setDrawerOpen(false); }, [location.pathname]);
 
   const handlers = useDashboardHandlers({
-    categoryId, folderId, navigate, setUser, setCategories, setCurrentCategory, setCurrentFolder, setFolders, setFiles, setSavedMedia, setLoading, setToast, setUploads, setShowSavedPicker
+    categories, categoryId, folderId, navigate, setUser, setCategories, setCurrentCategory, setCurrentFolder, setFolders, setFiles, setSavedMedia, setLoading, setToast, setUploads, setShowSavedPicker
   });
 
   // Manual sync: re-fetch saved messages from Telegram
@@ -140,8 +141,6 @@ export default function Dashboard() {
   };
 
   const openNewFolder = () => setFolderModal({ open: true, submitting: false, error: null, success: null });
-
-  const view = !categoryId ? 'saved' : !folderId ? 'category' : 'folder';
 
   return (
     <div className="flex h-dvh bg-slate-50 text-slate-900 antialiased dark:bg-[#0e1621] dark:text-slate-100">

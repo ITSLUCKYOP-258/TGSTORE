@@ -24,7 +24,7 @@ export default function MediaGrid({ media, onPreview, onDownload, onDelete, show
             className={`group relative aspect-square cursor-pointer overflow-hidden rounded-xl border transition hover:border-indigo-400 hover:shadow-md dark:border-white/5 dark:bg-[#17212b] dark:hover:border-sky-400/50 ${
               hasThumb ? 'border-slate-200 bg-slate-100' : 'border-slate-200 bg-white shadow-sm dark:shadow-none'
             }`}
-            onClick={() => onPreview?.(item)}
+            onClick={() => { if (!item._uploading) onPreview?.(item); }}
           >
             {item._localUrl ? (
               <img src={item._localUrl} alt={item.name} className="h-full w-full object-cover" />
@@ -64,35 +64,58 @@ export default function MediaGrid({ media, onPreview, onDownload, onDelete, show
               </div>
             )}
 
-            {/* Actions: download & delete */}
-            <div className="absolute right-2 top-2 flex gap-1 transition md:opacity-0 md:group-hover:opacity-100">
-              {onDownload && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDownload(item); }}
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition ${
-                    hasThumb
-                      ? 'bg-black/50 text-white hover:bg-black/75 backdrop-blur-sm'
-                      : 'border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-100 hover:text-slate-900 dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20'
-                  }`}
-                  aria-label="Download"
-                >
-                  ⬇
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition ${
-                    hasThumb
-                      ? 'bg-black/50 text-red-400 hover:bg-black/75 backdrop-blur-sm'
-                      : 'border border-slate-200 bg-white text-red-600 shadow-sm hover:bg-red-50 dark:border-white/10 dark:bg-white/10 dark:text-red-400 dark:hover:bg-red-500/20'
-                  }`}
-                  aria-label="Delete"
-                >
-                  🗑
-                </button>
-              )}
-            </div>
+            {/* Actions: download & delete (hidden while uploading) */}
+            {!item._uploading && (
+              <div className="absolute right-2 top-2 flex gap-1 transition md:opacity-0 md:group-hover:opacity-100 z-10">
+                {onDownload && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDownload(item); }}
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition ${
+                      hasThumb
+                        ? 'bg-black/50 text-white hover:bg-black/75 backdrop-blur-sm'
+                        : 'border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-100 hover:text-slate-900 dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20'
+                    }`}
+                    aria-label="Download"
+                  >
+                    ⬇
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition ${
+                      hasThumb
+                        ? 'bg-black/50 text-red-400 hover:bg-black/75 backdrop-blur-sm'
+                        : 'border border-slate-200 bg-white text-red-600 shadow-sm hover:bg-red-50 dark:border-white/10 dark:bg-white/10 dark:text-red-400 dark:hover:bg-red-500/20'
+                    }`}
+                    aria-label="Delete"
+                  >
+                    🗑
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Live Uploading Overlay */}
+            {item._uploading && (
+              <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 p-3 text-center text-white backdrop-blur-[2px]">
+                <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-full bg-sky-500/20 text-sky-400 ring-2 ring-sky-400/40">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
+                </div>
+                <span className="font-mono text-xs font-bold text-sky-300 drop-shadow">
+                  {item._progress != null ? `${item._progress}%` : 'Uploading…'}
+                </span>
+                <span className="mt-0.5 text-[10px] text-slate-300 drop-shadow">
+                  Uploading to Telegram
+                </span>
+                <div className="mt-2 h-1.5 w-3/4 overflow-hidden rounded-full bg-slate-800/80 ring-1 ring-white/10">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-sky-400 via-indigo-400 to-sky-300 transition-all duration-200"
+                    style={{ width: `${Math.max(5, item._progress || 0)}%` }}
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Saved badge */}
             {showSavedBadge && (

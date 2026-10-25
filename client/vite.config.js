@@ -11,6 +11,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       // Don't inject SW in dev — avoids stale-cache confusion while coding
       devOptions: { enabled: false },
+      skipImportAnalysis: true,
       includeAssets: [
         'icons/icon.svg',
         'icons/favicon-32.png',

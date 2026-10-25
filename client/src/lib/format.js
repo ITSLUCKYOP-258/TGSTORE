@@ -26,8 +26,9 @@ const ICONS = {
 };
 
 export function fileKind(file) {
+  if (!file) return 'file';
   const mime = file.mime || '';
-  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const ext = (file.name?.split('.').pop() || '').toLowerCase();
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   if (mime.startsWith('audio/')) return 'audio';

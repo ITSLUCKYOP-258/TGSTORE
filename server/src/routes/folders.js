@@ -85,44 +85,55 @@ router.post('/', async (req, res) => {
   let channelMessageId = 0;
 
   // Post the folder marker message in the user's category channel.
-  // Without it, file uploads have nothing to reply to, so this MUST succeed.
+  // Without it, file uploads have nothing to reply to, so this MUST succeed for MTProto.
   if (categoryId != null) {
     const category = db.getCategory(categoryId, req.userId);
     if (category && category.channel_id) {
-      if (!category.access_hash) {
-        return res.status(500).json({
-          error:
-            'Category has no saved accessHash. Delete and recreate this category ' +
-            '(required for channel operations).'
-        });
-      }
-      try {
-        console.log(
-          `[folders] posting folder marker user=${req.userId} category=${categoryId} ` +
-          `channel=${category.channel_id} name="${name}"`
-        );
-        const markerText = `📁 files::tgstore::${name}`;
-        const result = await postTextMessage(
-          req.userId,
-          category.channel_id,
-          category.access_hash,
-          markerText
-        );
-        channelMessageId = result.messageId;
-        console.log(
-          `[folders] folder marker posted user=${req.userId} category=${categoryId} ` +
-          `messageId=${channelMessageId}`
-        );
-      } catch (err) {
-        console.error(
-          `[folders] FAILED to post folder marker (user ${req.userId}, category ${categoryId}):`,
-          err?.message || err
-        );
-        return res.status(err?.status || 502).json({
-          error: `Could not post folder marker in the Telegram channel: ${err?.message || err}. ` +
-            'Folder creation cancelled — make sure you created the category with your own ' +
-            'Telegram account.'
-        });
+      if (category.access_hash) {
+        try {
+          console.log(
+            `[folders] posting folder marker user=${req.userId} category=${categoryId} ` +
+            `channel=${category.channel_id} name="${name}"`
+          );
+          const markerText = `📁 files::tgstore::${name}`;
+          const result = await postTextMessage(
+            req.userId,
+            category.channel_id,
+            category.access_hash,
+            markerText
+          );
+          channelMessageId = result.messageId;
+          console.log(
+            `[folders] folder marker posted user=${req.userId} category=${categoryId} ` +
+            `messageId=${channelMessageId}`
+          );
+        } catch (err) {
+          console.error(
+            `[folders] FAILED to post folder marker (user ${req.userId}, category ${categoryId}):`,
+            err?.message || err
+          );
+          return res.status(err?.status || 502).json({
+            error: `Could not post folder marker in the Telegram channel: ${err?.message || err}. ` +
+              'Folder creation cancelled — make sure you created the category with your own ' +
+              'Telegram account.'
+          });
+        }
+      } else if (process.env.BOT_TOKEN) {
+        // Bot API fallback
+        try {
+          const { tg } = await import('../telegram.js');
+          const markerText = `📁 files::tgstore::${name}`;
+          const msg = await tg('sendMessage', {
+            chat_id: category.channel_id,
+            text: markerText
+          });
+          channelMessageId = msg.message_id;
+          console.log(
+            `[folders] bot folder marker posted user=${req.userId} category=${categoryId} messageId=${channelMessageId}`
+          );
+        } catch (botErr) {
+          console.warn('[folders] failed to post bot folder marker message:', botErr?.message || botErr);
+        }
       }
     }
   }
@@ -161,7 +172,7 @@ router.delete('/:id', async (req, res) => {
   const { purgeFile } = await import('./drive.js');
   const ids = db.collectFolderIds(folder.id, userId);
   const placeholders = ids.map(() => '?').join(',');
-  const doomed = db
+  const doomed = dbInstance
     .prepare(`SELECT * FROM files WHERE folder_id IN (${placeholders}) AND user_id=?`)
     .all(...ids, userId);
   for (const f of doomed) await purgeFile(f, userId);

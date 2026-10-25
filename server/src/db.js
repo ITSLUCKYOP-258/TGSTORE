@@ -1,4 +1,4 @@
-﻿import Database from './sqlite-compat.js';
+import Database from './sqlite-compat.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -94,7 +94,6 @@ ensureColumn('folders', 'category_id', 'INTEGER REFERENCES categories(id)');
 ensureColumn('files', 'category_id', 'INTEGER REFERENCES categories(id)');
 ensureColumn('folders', 'channel_message_id', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('files', 'channel_message_id', 'INTEGER NOT NULL DEFAULT 0');
-ensureColumn('categories', 'access_hash', "TEXT NOT NULL DEFAULT ''");
 
 export default db;
 
@@ -371,6 +370,9 @@ export const getShareByToken = (token) =>
        FROM shares s JOIN files f ON f.id = s.file_id WHERE s.token=?`
     )
     .get(token);
+
+export const getShareForUser = (id, userId) =>
+  db.prepare('SELECT * FROM shares WHERE id=? AND user_id=?').get(id, userId);
 
 export const deleteShare = (id, userId) =>
   db.prepare('DELETE FROM shares WHERE id=? AND user_id=?').run(id, userId);

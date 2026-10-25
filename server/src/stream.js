@@ -96,14 +96,14 @@ export async function* telegramFileBytes(userId, chunks, file, { start = 0, end 
 export function serveFileStream(chunks, file, req, res, { asAttachment, userId }) {
   const size = Number(file.size || 0);
   const baseHeaders = {
-  'Content-Type': resolveMime(file.name, file.mime),
-  'Accept-Ranges': 'bytes',
-  // Range requests return 200 (full) vs 206 (partial) for the same URL,
-  // so caches MUST key on the Range header to avoid serving a stale
-  // full-file response that breaks audio/video track discovery.
-  'Vary': 'Range',
-  'Content-Disposition': `${asAttachment ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
-  'Cache-Control': 'private, max-age=3600',
+    'Content-Type': resolveMime(file.name, file.mime),
+    'Accept-Ranges': 'bytes',
+    // Range requests return 200 (full) vs 206 (partial) for the same URL,
+    // so caches MUST key on the Range header to avoid serving a stale
+    // full-file response that breaks audio/video track discovery.
+    'Vary': 'Range',
+    'Content-Disposition': `${asAttachment ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+    'Cache-Control': 'private, max-age=3600',
   };
   const source = () => telegramFileBytes(userId, chunks, file, {});
 

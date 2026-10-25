@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import db, { upsertTelegramUser, getUserById } from '../db.js';
+import db, { upsertTelegramUser, getUserById, listCategories } from '../db.js';
 import { requireAuth, signToken, setAuthCookie } from '../auth.js';
 import { resolveMime } from '../mime.js';
 import {
@@ -17,6 +17,7 @@ import {
   getMessageThumb,
   downloadBytes,
   getSavedMessagesId,
+  copySavedMediaToChannel,
 } from '../mtproto.js';
 
 const router = Router();
@@ -206,7 +207,7 @@ router.post('/saved-messages/copy', requireAuth, async (req, res) => {
 
     // Resolve the access hash server-side from the user's own categories —
     // never trust client-supplied secrets.
-    const cat = db.listCategories(req.userId).find(
+    const cat = listCategories(req.userId).find(
       (c) =>
         c.channel_id === String(channelId) ||
         `-100${c.channel_id}` === String(channelId)

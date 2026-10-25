@@ -87,7 +87,7 @@ export async function getFilePath(tgFileId) {
 }
 
 export function fileDownloadUrl(filePath) {
-  return `${apiBase()}/file/bot${process.env.BOT_TOKEN}/${filePath}`;
+  return `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath}`;
 }
 
 /* ---------- Telegram Login Widget verification ---------- */

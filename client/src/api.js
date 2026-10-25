@@ -25,10 +25,9 @@ function normalize(path) {
 }
 
 async function request(path, options = {}) {
-  const token = isNative() ? getToken() : null;
+  const token = getToken();
   const res = await fetch(BASE + normalize(path), {
-    // cookies only work on same-origin; native builds use Bearer instead
-    credentials: isNative() ? 'omit' : 'include',
+    credentials: 'include',
     ...options,
     headers: {
       ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
@@ -51,7 +50,11 @@ export const api = {
   // Auth
   devLogin: () => request('/auth/dev', { method: 'POST', body: '{}' }),
   me: () => request('/auth/me'),
-  logout: () => request('/auth/logout', { method: 'POST', body: '{}' }),
+  logout: async () => {
+  const res = await request('/auth/logout', { method: 'POST', body: '{}' });
+  clearToken();
+  return res;
+},
 
   // MTProto
   mtConfig: () => request('/mt/config'),
@@ -85,23 +88,20 @@ export const api = {
 
 /**
  * Upload with progress via XHR (fetch has no upload progress).
- * When `metaArmor` (an "TGS1:" encrypted-metadata string) is provided the
- * upload is E2EE: `file` is already the ciphertext blob and the armored
- * string travels in the `name` field. Returns a promise resolving to { file }.
+ * Returns a promise resolving to { file }.
  */
-export function uploadFile(file, folderId, onProgress, signal, categoryId, metaArmor) {
+export function uploadFile(file, folderId, onProgress, signal, categoryId) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', BASE + '/files/upload');
     xhr.responseType = 'json';
-    xhr.withCredentials = !isNative();
-    const token = isNative() ? getToken() : null;
+    xhr.withCredentials = true;
+    const token = getToken();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
     const form = new FormData();
     form.append('file', file, file.name || 'file');
-    form.append('name', metaArmor || file.name);
-    // Encrypted payloads are always opaque bytes — never leak the real MIME.
-    form.append('mime', metaArmor ? 'application/octet-stream' : file.type || 'application/octet-stream');
+    form.append('name', file.name || 'file');
+    form.append('mime', file.type || 'application/octet-stream');
     if (categoryId != null) form.append('categoryId', String(categoryId));
     if (folderId != null) form.append('folderId', String(folderId));
     xhr.upload.onprogress = (e) => {
@@ -109,7 +109,13 @@ export function uploadFile(file, folderId, onProgress, signal, categoryId, metaA
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve(xhr.response);
-      else reject(new Error(xhr.response?.error || `Upload failed (${xhr.status})`));
+      else {
+        const errorMsg =
+          xhr.response?.error ||
+          (typeof xhr.response === 'string' && xhr.response.length < 200 ? xhr.response : null) ||
+          `Upload failed (${xhr.status} ${xhr.statusText || ''})`.trim();
+        reject(new Error(errorMsg));
+      }
     };
     xhr.onerror = () => reject(new Error('Network error during upload'));
     signal?.addEventListener('abort', () => {

@@ -30,6 +30,22 @@ function makeClient(sessionString) {
   return client;
 }
 
+/** Detect Telegram AUTH_KEY_UNREGISTERED errors (session invalidated by Telegram). */
+function isAuthKeyUnregistered(err) {
+  const msg = String(err?.message || err || '');
+  return msg.includes('AUTH_KEY_UNREGISTERED');
+}
+
+/** Invalidate a user's Telegram session: disconnect cached client + clear DB session. */
+export async function invalidateUserSession(userId) {
+  const client = clients.get(userId);
+  if (client) {
+    await client.disconnect?.().catch(() => {});
+    clients.delete(userId);
+  }
+  setMtSession(userId, '', '');
+}
+
 /* ------------------------------------------------------------------ */
 /* Channel peer helpers                                               */
 /*                                                                    */
@@ -173,7 +189,21 @@ const clients = new Map(); // userId -> TelegramClient
 export async function getUserClient(userId) {
   const cached = clients.get(userId);
   if (cached) {
-    if (!cached.connected) await cached.connect().catch(() => {});
+    if (!cached.connected) {
+      try {
+        await cached.connect();
+      } catch (err) {
+        if (isAuthKeyUnregistered(err)) {
+          await invalidateUserSession(userId);
+          const authErr = new Error(
+            'Telegram session expired — please log in again (Disconnect Telegram account, then reconnect).'
+          );
+          authErr.status = 401;
+          throw authErr;
+        }
+        throw new Error('Could not connect to Telegram: ' + err.message);
+      }
+    }
     return cached;
   }
   const user = getUserById(userId);
@@ -186,6 +216,14 @@ export async function getUserClient(userId) {
   try {
     await client.connect();
   } catch (err) {
+    if (isAuthKeyUnregistered(err)) {
+      await invalidateUserSession(userId);
+      const authErr = new Error(
+        'Telegram session expired — please log in again (Disconnect Telegram account, then reconnect).'
+      );
+      authErr.status = 401;
+      throw authErr;
+    }
     throw new Error('Could not connect to Telegram: ' + err.message);
   }
   clients.set(userId, client);
@@ -572,10 +610,23 @@ export async function sendFileToChannel(
   );
 
   // Upload original bytes directly via client.uploadFile
-  const fileHandle = await client.uploadFile({
-    file: input,
-    workers: 1,
-  });
+  let fileHandle;
+  try {
+    fileHandle = await client.uploadFile({
+      file: input,
+      workers: 1,
+    });
+  } catch (err) {
+    if (isAuthKeyUnregistered(err)) {
+      await invalidateUserSession(userId);
+      const authErr = new Error(
+        'Telegram session expired — please log in again (Disconnect Telegram account, then reconnect).'
+      );
+      authErr.status = 401;
+      throw authErr;
+    }
+    throw err;
+  }
 
   // Explicitly set forceFile: true on InputMediaUploadedDocument so Telegram
   // NEVER compresses or transcodes images/videos to photos. Original bytes stay intact.
@@ -596,15 +647,28 @@ export async function sendFileToChannel(
         : undefined,
   });
 
-  const result = await client.invoke(request);
-  const msg = client._getResponseMessage(request, result, peer);
+  let invokeResult;
+  try {
+    invokeResult = await client.invoke(request);
+  } catch (err) {
+    if (isAuthKeyUnregistered(err)) {
+      await invalidateUserSession(userId);
+      const authErr = new Error(
+        'Telegram session expired — please log in again (Disconnect Telegram account, then reconnect).'
+      );
+      authErr.status = 401;
+      throw authErr;
+    }
+    throw err;
+  }
+  const msg = client._getResponseMessage(request, invokeResult, peer);
   const doc = msg?.document || msg?.media?.document;
 
   let messageId = toNum(msg?.id) || 0;
   let fileId = doc?.id ? String(doc.id) : null;
 
   if (!messageId || !fileId) {
-    for (const u of result?.updates || []) {
+    for (const u of invokeResult?.updates || []) {
       if (u.className === 'UpdateMessageID') messageId = toNum(u.id) || messageId;
       if (u.message && (u.className === 'UpdateNewChannelMessage' || u.className === 'UpdateNewMessage')) {
         const m = u.message;

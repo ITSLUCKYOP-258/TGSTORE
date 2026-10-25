@@ -63,7 +63,6 @@ export default function FolderView({
               <input
                 type="file"
                 multiple
-                accept="image/*,video/*,audio/*,application/*"
                 className="hidden"
                 onChange={(e) => {
                   if (e.target.files?.length) {
