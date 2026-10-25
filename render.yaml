@@ -4,9 +4,8 @@ services:
     runtime: node
     region: singapore
     plan: free
-    rootDir: server
-    buildCommand: npm install --include=dev && cd ../client && npm install --include=dev && npm run build && cd ../server
-    startCommand: node src/index.js
+    buildCommand: npm run build
+    startCommand: npm start
     healthCheckPath: /api/health
     # Note: Render Free plan does not support persistent disks.
     # To enable persistent SQLite storage on Render, change plan: starter ($7/mo)

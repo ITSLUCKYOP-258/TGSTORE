@@ -30,6 +30,8 @@ app.set('trust proxy', 1);
 const ALLOWED_ORIGINS = new Set(
   [
     process.env.CLIENT_ORIGIN,
+    process.env.RENDER_EXTERNAL_URL,
+    process.env.PUBLIC_BASE_URL,
     'capacitor://localhost',
     'ionic://localhost',
     'http://localhost',

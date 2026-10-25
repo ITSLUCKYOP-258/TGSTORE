@@ -65,8 +65,9 @@ router.post('/logout', (req, res) => {
 /** Frontend asks for config needed to render the login widget. */
 router.get('/config', (_req, res) => {
   const botUsername = process.env.BOT_USERNAME || '';
+  const publicUrl = process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || '';
   res.json({
-    telegramLoginEnabled: Boolean(botUsername) && Boolean(process.env.PUBLIC_BASE_URL),
+    telegramLoginEnabled: Boolean(botUsername) && Boolean(publicUrl),
     botUsername,
     devLoginEnabled: process.env.DEV_LOGIN === 'true',
   });
